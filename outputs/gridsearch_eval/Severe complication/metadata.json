@@ -1,0 +1,124 @@
+{
+    "timestamp": "2026-03-05 16:04:35",
+    "target_column": "Severe complication",
+    "task_type": "binary",
+    "split_strategy": "temporal",
+    "split_config": {
+        "test_size": 0.2,
+        "split_column": null,
+        "date_column": "Date of surgery"
+    },
+    "dataset_info": {
+        "total_samples": 731,
+        "train_samples": 584,
+        "test_samples": 146,
+        "fit_samples": 468,
+        "threshold_validation_samples": 116
+    },
+    "models_trained": [
+        "hgb",
+        "rf",
+        "lr",
+        "svc",
+        "torch_mlp"
+    ],
+    "data_configuration": {
+        "input_file": "./data/SBM1212.xlsx",
+        "input_features": [
+            "Sex",
+            "Pre-Op KPS",
+            "Radio_Pre-Op max_axial_diam_mm",
+            "Radio_Edema",
+            "Charlson Comorbidity Index",
+            "Age",
+            "ASA",
+            "Symptoms_Incidental finding",
+            "Symptoms_Acute onset (1<month)",
+            "Symptoms_Seizure",
+            "Symptoms_Headache",
+            "Symptoms_Motor deficits",
+            "Symptoms_Aphasia/dysartria",
+            "Symptoms_CN deficits",
+            "Symptoms_Nausea/Vomit",
+            "Symptoms_Visual deficits",
+            "Symptoms_Cognitive/psychiatrist disorder",
+            "Symptoms_Hyperprolatinemia",
+            "Optic nerve/chiasm compression",
+            "Center",
+            "Radio_Tumor side",
+            "Surgical Approach",
+            "Simpson Grade",
+            "EOR",
+            "Date of Birth",
+            "Date of surgery"
+        ],
+        "cols_string": [
+            "Center",
+            "Radio_Tumor side",
+            "Surgical Approach",
+            "Simpson Grade",
+            "EOR"
+        ],
+        "cols_date": [
+            "Date of Birth",
+            "Date of surgery"
+        ],
+        "cols_multi": []
+    },
+    "model_hyperparameters": {
+        "hgb": {
+            "l2_regularization": 1.0,
+            "learning_rate": 0.01,
+            "max_depth": null,
+            "max_iter": 1000
+        },
+        "rf": {
+            "max_depth": 10,
+            "max_features": "sqrt",
+            "min_samples_leaf": 1,
+            "n_estimators": 300,
+            "class_weight": {
+                "false": 0.5412262156448203,
+                "true": 6.564102564102564
+            }
+        },
+        "lr": {
+            "C": 100.0,
+            "max_iter": 2000,
+            "solver": "lbfgs",
+            "class_weight": {
+                "false": 0.5412262156448203,
+                "true": 6.564102564102564
+            }
+        },
+        "svc": {
+            "C": 100.0,
+            "gamma": "scale",
+            "kernel": "linear",
+            "probability": true,
+            "class_weight": {
+                "false": 0.5412262156448203,
+                "true": 6.564102564102564
+            }
+        },
+        "torch_mlp": {
+            "batch_size": 64,
+            "dropout": 0.4,
+            "epochs": 150,
+            "hidden_layers": [
+                64,
+                32
+            ],
+            "learning_rate": 0.0001,
+            "weight_decay": 0.0,
+            "pos_weight": 12.128205128205128
+        }
+    },
+    "binary_decision_policy": {
+        "threshold_val_size": 0.2,
+        "min_recall": 0.8,
+        "f_beta": 2.0,
+        "fn_cost": 1.0,
+        "fp_cost": 5.0
+    }
+}

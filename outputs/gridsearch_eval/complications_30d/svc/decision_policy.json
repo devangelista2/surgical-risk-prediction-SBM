@@ -1,0 +1,20 @@
+{
+    "threshold": 0.08424242424242423,
+    "f_beta": 2.0,
+    "fn_cost": 1.0,
+    "fp_cost": 5.0,
+    "selection_on_validation": {
+        "tn": 83,
+        "fp": 24,
+        "fn": 0,
+        "tp": 9,
+        "recall": 1.0,
+        "precision": 0.2727272727272727,
+        "specificity": 0.7757009345794392,
+        "npv": 1.0,
+        "f_beta": 0.6521739130434783,
+        "expected_cost": 120.0,
+        "threshold": 0.08424242424242423,
+        "meets_recall_constraint": true
+    }
+}

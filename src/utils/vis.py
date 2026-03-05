@@ -8,17 +8,33 @@ from sklearn.metrics import auc, confusion_matrix, precision_recall_curve, roc_c
 # Configure matplotlib for scientific publication quality
 plt.rcParams.update(
     {
-        "font.size": 12,
-        "axes.titlesize": 14,
-        "axes.labelsize": 12,
+        "font.family": "serif",
+        "font.serif": ["Times New Roman", "Times", "DejaVu Serif"],
+        "font.size": 11,
+        "axes.titlesize": 13,
+        "axes.labelsize": 11,
+        "axes.linewidth": 0.8,
+        "axes.edgecolor": "#333333",
         "xtick.labelsize": 10,
         "ytick.labelsize": 10,
         "legend.fontsize": 10,
-        "figure.dpi": 300,  # High resolution for papers
-        "savefig.bbox": "tight",  # Prevent cropping of labels
+        "grid.color": "#d9d9d9",
+        "grid.linewidth": 0.6,
+        "grid.alpha": 0.65,
+        "figure.dpi": 300,  # High resolution raster export
+        "savefig.bbox": "tight",
+        "savefig.pad_inches": 0.08,
     }
 )
-sns.set_theme(style="ticks", context="paper")
+sns.set_theme(style="whitegrid", context="paper")
+
+
+def _save_figure(save_path: Path):
+    save_path = Path(save_path)
+    save_path.parent.mkdir(parents=True, exist_ok=True)
+    plt.savefig(save_path, dpi=300)
+    # Always export a vector version for publication.
+    plt.savefig(save_path.with_suffix(".pdf"))
 
 
 def plot_confusion_matrix(y_true, y_pred, classes, title: str, save_path: Path):
@@ -36,8 +52,9 @@ def plot_confusion_matrix(y_true, y_pred, classes, title: str, save_path: Path):
     plt.title(title, pad=15)
     plt.ylabel("True Label")
     plt.xlabel("Predicted Label")
-    sns.despine()
-    plt.savefig(save_path)
+    plt.tight_layout()
+    sns.despine(offset=8)
+    _save_figure(save_path)
     plt.close()
 
 
@@ -54,8 +71,9 @@ def plot_roc_curve(y_true_bin, y_prob_pos, title: str, save_path: Path):
     plt.ylabel("True Positive Rate")
     plt.title(title, pad=15)
     plt.legend(loc="lower right", frameon=True)
-    sns.despine()
-    plt.savefig(save_path)
+    plt.tight_layout()
+    sns.despine(offset=8)
+    _save_figure(save_path)
     plt.close()
 
 
@@ -67,8 +85,9 @@ def plot_pr_curve(y_true_bin, y_prob_pos, title: str, save_path: Path):
     plt.xlabel("Recall")
     plt.ylabel("Precision")
     plt.title(title, pad=15)
-    sns.despine()
-    plt.savefig(save_path)
+    plt.tight_layout()
+    sns.despine(offset=8)
+    _save_figure(save_path)
     plt.close()
 
 
@@ -86,8 +105,42 @@ def plot_regression_scatter(y_true, y_pred, title: str, save_path: Path):
     plt.ylabel("Predicted Values")
     plt.title(title, pad=15)
     plt.legend(loc="upper left")
-    sns.despine()
-    plt.savefig(save_path)
+    plt.tight_layout()
+    sns.despine(offset=8)
+    _save_figure(save_path)
+    plt.close()
+
+
+def plot_feature_importance(
+    features, importances, stds, title: str, save_path: Path, top_n: int = 20
+):
+    features = list(features)
+    importances = np.asarray(importances, dtype=float)
+    stds = np.asarray(stds, dtype=float)
+
+    if len(features) == 0:
+        return
+
+    order = np.argsort(importances)[::-1]
+    top_idx = order[:top_n]
+    plot_features = [features[i] for i in top_idx][::-1]
+    plot_importances = importances[top_idx][::-1]
+    plot_stds = stds[top_idx][::-1]
+
+    plt.figure(figsize=(8, max(4, len(plot_features) * 0.3)))
+    plt.barh(
+        plot_features,
+        plot_importances,
+        xerr=plot_stds,
+        color="#1f77b4",
+        alpha=0.85,
+        ecolor="#4d4d4d",
+    )
+    plt.xlabel("Permutation Importance")
+    plt.title(title, pad=15)
+    plt.tight_layout()
+    sns.despine(offset=8)
+    _save_figure(save_path)
     plt.close()
 
 
@@ -110,8 +163,9 @@ def plot_combined_roc_curve(y_true_bin, y_prob_dict: dict, title: str, save_path
     plt.ylabel("True Positive Rate")
     plt.title(title, pad=15)
     plt.legend(loc="lower right", frameon=True)
-    sns.despine()
-    plt.savefig(save_path)
+    plt.tight_layout()
+    sns.despine(offset=8)
+    _save_figure(save_path)
     plt.close()
 
 
@@ -131,6 +185,7 @@ def plot_combined_pr_curve(y_true_bin, y_prob_dict: dict, title: str, save_path:
     plt.ylabel("Precision")
     plt.title(title, pad=15)
     plt.legend(loc="upper right", frameon=True)
-    sns.despine()
-    plt.savefig(save_path)
+    plt.tight_layout()
+    sns.despine(offset=8)
+    _save_figure(save_path)
     plt.close()

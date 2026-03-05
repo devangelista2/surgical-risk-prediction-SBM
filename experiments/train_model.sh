@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 
 # ==========================================
 # MedModel Training Configuration
@@ -16,6 +17,16 @@ SPLIT_STRATEGY="temporal"
 SPLIT_COLUMN="Split"
 TEST_SIZE="0.2"
 DATE_COLUMN="Date of surgery"
+
+# FN-sensitive decision policy (binary tasks)
+THRESHOLD_VAL_SIZE="0.2"
+MIN_RECALL="0.90"
+F_BETA="2.0"
+FN_COST="5.0"
+FP_COST="1.0"
+
+# Optional extras
+FEATURE_IMPORTANCE="false"
 
 # ==========================================
 # Run Training Script
@@ -52,11 +63,20 @@ for TARGET_COLUMN in "${TARGETS[@]}"; do
         --split_strategy \"$SPLIT_STRATEGY\" \
         --test_size $TEST_SIZE \
         --split_column \"$SPLIT_COLUMN\" \
-        --date_column \"$DATE_COLUMN\""
+        --date_column \"$DATE_COLUMN\" \
+        --threshold_val_size $THRESHOLD_VAL_SIZE \
+        --min_recall $MIN_RECALL \
+        --f_beta $F_BETA \
+        --fn_cost $FN_COST \
+        --fp_cost $FP_COST"
 
     # Add models argument if it's not empty
     if [ -n "$MODELS" ]; then
         CMD="$CMD --models \"$MODELS\""
+    fi
+
+    if [ "$FEATURE_IMPORTANCE" = "true" ]; then
+        CMD="$CMD --feature_importance"
     fi
 
     # Execute the training command

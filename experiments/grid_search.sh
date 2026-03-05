@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 
 # ==========================================
 # MedModel Grid Search Configuration
@@ -13,10 +14,18 @@ DATE_COLUMN="Date of surgery"
 TEST_SIZE="0.15"
 VAL_SIZE="0.15"
 
+# FN-sensitive tuning policy
+MIN_RECALL="0.90"
+F_BETA="2.0"
+FN_COST="5.0"
+FP_COST="1.0"
+
 # Define the list of target variables
 TARGETS=(
+    "complications_30d"
     "Severe complication"
     "KPS_Discharge Worsened"
+    "New neurological deficits"
 )
 
 echo "Starting MedModel Grid Search Pipeline..."
@@ -44,7 +53,11 @@ for TARGET_COLUMN in "${TARGETS[@]}"; do
         --output_file \"$OUTPUT_FILE\" \
         --date_column \"$DATE_COLUMN\" \
         --test_size $TEST_SIZE \
-        --val_size $VAL_SIZE"
+        --val_size $VAL_SIZE \
+        --min_recall $MIN_RECALL \
+        --f_beta $F_BETA \
+        --fn_cost $FN_COST \
+        --fp_cost $FP_COST"
 
     # Execute the tuning command
     eval $CMD

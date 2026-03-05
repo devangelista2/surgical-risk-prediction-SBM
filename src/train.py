@@ -16,6 +16,7 @@ from sklearn.ensemble import (
     RandomForestRegressor,
 )
 from sklearn.impute import SimpleImputer
+from sklearn.inspection import permutation_importance
 from sklearn.linear_model import LogisticRegression, Ridge
 from sklearn.metrics import (
     accuracy_score,
@@ -130,11 +131,144 @@ def get_model(model_name: str, task_type: str, params: dict):
     return registry[task_type][model_name](**params)
 
 
+def balanced_weights_from_y(y_series):
+    y_np = np.asarray(y_series)
+    classes, counts = np.unique(y_np, return_counts=True)
+    n_samples = len(y_np)
+    n_classes = len(classes)
+    return {
+        cls: float(n_samples / (n_classes * count))
+        for cls, count in zip(classes, counts, strict=False)
+    }
+
+
+def sample_weight_from_y(y_series):
+    class_weights = balanced_weights_from_y(y_series)
+    y_np = np.asarray(y_series)
+    return np.asarray([class_weights[v] for v in y_np], dtype=float)
+
+
+def normalize_class_weight_keys(class_weight: dict, task_type: str):
+    normalized = {}
+    for key, value in class_weight.items():
+        new_key = key
+        if task_type == "binary":
+            if isinstance(key, str):
+                lk = key.strip().lower()
+                if lk in {"true", "1"}:
+                    new_key = True
+                elif lk in {"false", "0"}:
+                    new_key = False
+        normalized[new_key] = value
+    return normalized
+
+
+def apply_imbalance_strategy(model_name: str, task_type: str, params: dict, y_train):
+    new_params = dict(params)
+    if "class_weight" in new_params and isinstance(new_params["class_weight"], dict):
+        new_params["class_weight"] = normalize_class_weight_keys(
+            new_params["class_weight"], task_type
+        )
+
+    if task_type not in {"binary", "categorical"}:
+        return new_params
+
+    weights = balanced_weights_from_y(y_train)
+    if not weights:
+        return new_params
+
+    if model_name in {"rf", "lr", "svc"} and "class_weight" not in new_params:
+        new_params["class_weight"] = {
+            k.item() if hasattr(k, "item") else k: v for k, v in weights.items()
+        }
+
+    if model_name in {"torch_mlp", "torch_ft_transformer"}:
+        classes_sorted = sorted(weights.keys())
+        if task_type == "binary" and "pos_weight" not in new_params:
+            neg_label, pos_label = classes_sorted[0], classes_sorted[-1]
+            neg_w = weights[neg_label]
+            pos_w = weights[pos_label]
+            if neg_w > 0:
+                new_params["pos_weight"] = float(pos_w / neg_w)
+        elif task_type == "categorical" and "class_weights" not in new_params:
+            new_params["class_weights"] = [float(weights[c]) for c in classes_sorted]
+
+    return new_params
+
+
+def binary_confusion_metrics(y_true_bin, y_pred_bin, beta=2.0, fn_cost=5.0, fp_cost=1.0):
+    tn, fp, fn, tp = confusion_matrix(y_true_bin, y_pred_bin, labels=[0, 1]).ravel()
+    recall = tp / (tp + fn) if (tp + fn) else 0.0
+    precision = tp / (tp + fp) if (tp + fp) else 0.0
+    specificity = tn / (tn + fp) if (tn + fp) else 0.0
+    npv = tn / (tn + fn) if (tn + fn) else 0.0
+    beta2 = beta * beta
+    f_beta = (
+        (1 + beta2) * precision * recall / (beta2 * precision + recall)
+        if (precision + recall)
+        else 0.0
+    )
+    expected_cost = fn_cost * fn + fp_cost * fp
+    return {
+        "tn": int(tn),
+        "fp": int(fp),
+        "fn": int(fn),
+        "tp": int(tp),
+        "recall": float(recall),
+        "precision": float(precision),
+        "specificity": float(specificity),
+        "npv": float(npv),
+        "f_beta": float(f_beta),
+        "expected_cost": float(expected_cost),
+    }
+
+
+def select_binary_threshold(
+    y_true_bin, y_prob_pos, min_recall=0.9, beta=2.0, fn_cost=5.0, fp_cost=1.0
+):
+    thresholds = np.linspace(0.01, 0.99, 199)
+    candidates = []
+    for thr in thresholds:
+        y_pred_bin = (y_prob_pos >= thr).astype(int)
+        metric = binary_confusion_metrics(
+            y_true_bin, y_pred_bin, beta=beta, fn_cost=fn_cost, fp_cost=fp_cost
+        )
+        metric["threshold"] = float(thr)
+        candidates.append(metric)
+
+    feasible = [c for c in candidates if c["recall"] >= min_recall]
+    if feasible:
+        best = max(
+            feasible,
+            key=lambda c: (c["precision"], c["f_beta"], -c["expected_cost"]),
+        )
+        best["meets_recall_constraint"] = True
+        return best
+
+    best = max(
+        candidates,
+        key=lambda c: (c["recall"], c["precision"], c["f_beta"], -c["expected_cost"]),
+    )
+    best["meets_recall_constraint"] = False
+    return best
+
+
 def evaluate_and_save(
-    model_name: str, pipeline: Pipeline, X_test, y_test, task_type: str, out_dir: Path
+    model_name: str,
+    pipeline: Pipeline,
+    X_test,
+    y_test,
+    task_type: str,
+    out_dir: Path,
+    feature_importance: bool = False,
+    decision_threshold: float | None = None,
+    threshold_selection: dict | None = None,
+    f_beta: float = 2.0,
+    fn_cost: float = 5.0,
+    fp_cost: float = 1.0,
 ):
     metrics = {}
-    plot_data = {}  # Added to store data for combined plots
+    plot_data = {}
     model_dir = out_dir / model_name
     model_dir.mkdir(parents=True, exist_ok=True)
 
@@ -156,13 +290,78 @@ def evaluate_and_save(
         )
 
     else:
+        classes = getattr(pipeline.named_steps["model"], "classes_", np.unique(y_test))
+
+        if task_type == "binary" and y_prob is not None:
+            pos_idx = 1 if y_prob.shape[1] > 1 else 0
+            neg_idx = 1 - pos_idx if len(classes) > 1 else 0
+            y_prob_pos = y_prob[:, pos_idx]
+            threshold = 0.5 if decision_threshold is None else float(decision_threshold)
+
+            pos_label = classes[pos_idx]
+            neg_label = classes[neg_idx]
+            y_pred_bin = (y_prob_pos >= threshold).astype(int)
+            y_pred = np.where(y_pred_bin == 1, pos_label, neg_label)
+
+            y_true_bin = (y_test == pos_label).astype(int).to_numpy()
+
+            metrics["selected_threshold"] = float(threshold)
+            metrics["roc_auc"] = float(roc_auc_score(y_true_bin, y_prob_pos))
+            metrics["average_precision"] = float(
+                average_precision_score(y_true_bin, y_prob_pos)
+            )
+            metrics["log_loss"] = float(log_loss(y_true_bin, y_prob_pos))
+            metrics.update(
+                binary_confusion_metrics(
+                    y_true_bin,
+                    y_pred_bin,
+                    beta=f_beta,
+                    fn_cost=fn_cost,
+                    fp_cost=fp_cost,
+                )
+            )
+
+            if threshold_selection:
+                metrics["threshold_selection"] = threshold_selection
+
+            vis.plot_roc_curve(
+                y_true_bin,
+                y_prob_pos,
+                f"ROC Curve - {model_name.upper()}",
+                model_dir / "roc_curve.png",
+            )
+            vis.plot_pr_curve(
+                y_true_bin,
+                y_prob_pos,
+                f"Precision-Recall Curve - {model_name.upper()}",
+                model_dir / "pr_curve.png",
+            )
+
+            plot_data["y_true_bin"] = y_true_bin
+            plot_data["y_prob_pos"] = y_prob_pos
+
+            policy = {
+                "threshold": float(threshold),
+                "f_beta": float(f_beta),
+                "fn_cost": float(fn_cost),
+                "fp_cost": float(fp_cost),
+            }
+            if threshold_selection:
+                policy["selection_on_validation"] = threshold_selection
+            with open(model_dir / "decision_policy.json", "w", encoding="utf-8") as f:
+                json.dump(policy, f, indent=4)
+
+        elif task_type == "categorical" and y_prob is not None:
+            metrics["roc_auc_ovr"] = float(roc_auc_score(y_test, y_prob, multi_class="ovr"))
+            metrics["log_loss"] = float(log_loss(y_test, y_prob))
+            metrics["f1_macro"] = float(f1_score(y_test, y_pred, average="macro"))
+
         metrics["accuracy"] = float(accuracy_score(y_test, y_pred))
         metrics["confusion_matrix"] = confusion_matrix(y_test, y_pred).tolist()
         metrics["classification_report"] = classification_report(
             y_test, y_pred, output_dict=True, zero_division=0
         )
 
-        classes = getattr(pipeline.named_steps["model"], "classes_", np.unique(y_test))
         vis.plot_confusion_matrix(
             y_test,
             y_pred,
@@ -171,47 +370,56 @@ def evaluate_and_save(
             model_dir / "confusion_matrix.png",
         )
 
-        if y_prob is not None:
-            if task_type == "binary":
-                pos_idx = 1 if y_prob.shape[1] > 1 else 0
-                y_prob_pos = y_prob[:, pos_idx]
-
-                pos_label = classes[pos_idx]
-                y_true_bin = (y_test == pos_label).astype(int)
-
-                metrics["roc_auc"] = float(roc_auc_score(y_true_bin, y_prob_pos))
-                metrics["average_precision"] = float(
-                    average_precision_score(y_true_bin, y_prob_pos)
-                )
-                metrics["log_loss"] = float(log_loss(y_true_bin, y_prob_pos))
-
-                vis.plot_roc_curve(
-                    y_true_bin,
-                    y_prob_pos,
-                    f"ROC Curve - {model_name.upper()}",
-                    model_dir / "roc_curve.png",
-                )
-                vis.plot_pr_curve(
-                    y_true_bin,
-                    y_prob_pos,
-                    f"Precision-Recall Curve - {model_name.upper()}",
-                    model_dir / "pr_curve.png",
-                )
-
-                # Save plot data for combined graphs
-                plot_data["y_true_bin"] = y_true_bin
-                plot_data["y_prob_pos"] = y_prob_pos
-
-            elif task_type == "categorical":
-                metrics["roc_auc_ovr"] = float(
-                    roc_auc_score(y_test, y_prob, multi_class="ovr")
-                )
-                metrics["log_loss"] = float(log_loss(y_test, y_prob))
-                metrics["f1_macro"] = float(f1_score(y_test, y_pred, average="macro"))
-
     joblib.dump(pipeline, model_dir / "pipeline.joblib")
     with open(model_dir / "metrics.json", "w") as f:
         json.dump(metrics, f, indent=4)
+
+    if feature_importance:
+        try:
+            scoring = "accuracy"
+            if (
+                task_type == "binary"
+                and hasattr(pipeline, "predict_proba")
+                and model_name not in {"torch_mlp", "torch_ft_transformer"}
+            ):
+                scoring = "roc_auc"
+            elif task_type == "continuous":
+                scoring = "r2"
+
+            pi_results = permutation_importance(
+                pipeline, X_test, y_test, scoring=scoring, n_repeats=5, random_state=42
+            )
+            features = X_test.columns.tolist()
+            importances_mean = pi_results.importances_mean
+            importances_std = pi_results.importances_std
+
+            sorted_idx = importances_mean.argsort()
+            sorted_features = [features[i] for i in sorted_idx]
+            sorted_importances = importances_mean[sorted_idx]
+            sorted_std = importances_std[sorted_idx]
+
+            fi_df = pd.DataFrame(
+                {
+                    "Feature": sorted_features[::-1],
+                    "Importance": sorted_importances[::-1],
+                    "Std": sorted_std[::-1],
+                }
+            )
+            fi_df.to_csv(model_dir / "feature_importance.csv", index=False)
+
+            vis.plot_feature_importance(
+                sorted_features,
+                sorted_importances,
+                sorted_std,
+                f"Feature Importance ({model_name.upper()})",
+                model_dir / "feature_importance.png",
+            )
+        except Exception as e:
+            from utils.logger import logger
+
+            logger.warning(
+                f"Could not compute feature importance for {model_name}: {e}"
+            )
 
     return metrics, plot_data
 
@@ -258,6 +466,41 @@ def main():
         default="Date of surgery",
         help="Column name used for temporal split sorting.",
     )
+    parser.add_argument(
+        "--feature_importance",
+        action="store_true",
+        help="Whether to compute and visualize permutation feature importance.",
+    )
+    parser.add_argument(
+        "--threshold_val_size",
+        type=float,
+        default=0.2,
+        help="Validation fraction carved from train set to choose binary threshold.",
+    )
+    parser.add_argument(
+        "--min_recall",
+        type=float,
+        default=0.9,
+        help="Minimum target recall for binary threshold selection.",
+    )
+    parser.add_argument(
+        "--f_beta",
+        type=float,
+        default=2.0,
+        help="Beta used in F-beta for binary operating-point selection.",
+    )
+    parser.add_argument(
+        "--fn_cost",
+        type=float,
+        default=5.0,
+        help="Relative cost of false negatives for threshold selection.",
+    )
+    parser.add_argument(
+        "--fp_cost",
+        type=float,
+        default=1.0,
+        help="Relative cost of false positives for threshold selection.",
+    )
     args = parser.parse_args()
 
     out_dir = Path(args.output_folder)
@@ -269,10 +512,12 @@ def main():
     if args.models:
         selected_models = [m.strip() for m in args.models.split(",") if m.strip()]
         models_to_train = {
-            k: v for k, v in models_config.items() if k in selected_models
+            k: v
+            for k, v in models_config.items()
+            if k in selected_models and isinstance(v, dict)
         }
     else:
-        models_to_train = models_config
+        models_to_train = {k: v for k, v in models_config.items() if isinstance(v, dict)}
 
     input_file_path = data_config["input_file"]
     logger.info(f"Loading data from {input_file_path}...")
@@ -339,6 +584,33 @@ def main():
 
     logger.info(f"Data split successful: {len(X_train)} Train, {len(X_test)} Test")
 
+    X_fit, y_fit = X_train, y_train
+    X_val_threshold, y_val_threshold = None, None
+
+    if task_type == "binary" and args.threshold_val_size > 0:
+        can_split = len(X_train) > 20 and y_train.nunique() > 1
+        if can_split and args.split_strategy == "temporal":
+            val_n = int(len(X_train) * args.threshold_val_size)
+            if 0 < val_n < len(X_train):
+                X_fit = X_train.iloc[:-val_n]
+                y_fit = y_train.iloc[:-val_n]
+                X_val_threshold = X_train.iloc[-val_n:]
+                y_val_threshold = y_train.iloc[-val_n:]
+        elif can_split:
+            try:
+                X_fit, X_val_threshold, y_fit, y_val_threshold = train_test_split(
+                    X_train,
+                    y_train,
+                    test_size=args.threshold_val_size,
+                    random_state=42,
+                    stratify=y_train,
+                )
+            except Exception:
+                X_fit, y_fit = X_train, y_train
+
+    formatted_cols = "\n".join(f"  - {col}" for col in df.columns.tolist())
+    logger.info(f"Pre-processing done. Found columns:\n{formatted_cols}")
+
     experiment_metadata = {
         "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "target_column": col_output,
@@ -359,10 +631,23 @@ def main():
             "total_samples": len(df),
             "train_samples": len(X_train),
             "test_samples": len(X_test),
+            "fit_samples": len(X_fit),
+            "threshold_validation_samples": (
+                len(X_val_threshold) if X_val_threshold is not None else 0
+            ),
         },
         "models_trained": list(models_to_train.keys()),
         "data_configuration": data_config,
         "model_hyperparameters": models_to_train,
+        "binary_decision_policy": {
+            "threshold_val_size": (
+                args.threshold_val_size if task_type == "binary" else None
+            ),
+            "min_recall": args.min_recall if task_type == "binary" else None,
+            "f_beta": args.f_beta if task_type == "binary" else None,
+            "fn_cost": args.fn_cost if task_type == "binary" else None,
+            "fp_cost": args.fp_cost if task_type == "binary" else None,
+        },
     }
 
     with open(out_dir / "metadata.json", "w", encoding="utf-8") as f:
@@ -381,6 +666,8 @@ def main():
         start_time = perf_counter()
 
         try:
+            tuned_params = apply_imbalance_strategy(model_name, task_type, params, y_fit)
+
             use_scaler = model_name in {
                 "lr",
                 "ridge",
@@ -397,24 +684,75 @@ def main():
                 use_scaler,
             )
 
-            model = get_model(model_name, task_type, params)
+            model = get_model(model_name, task_type, tuned_params)
             pipeline = Pipeline([("preprocess", preprocessor), ("model", model)])
 
             if model_name in {"torch_mlp", "torch_ft_transformer"}:
                 X_train_t = pipeline.named_steps["preprocess"].fit_transform(
-                    X_train, y_train
+                    X_fit, y_fit
                 )
-                X_eval_t = pipeline.named_steps["preprocess"].transform(X_test)
-                pipeline.named_steps["model"].fit(
-                    X_train_t, y_train, eval_set=(X_eval_t, y_test)
-                )
+                if X_val_threshold is not None:
+                    X_eval_t = pipeline.named_steps["preprocess"].transform(
+                        X_val_threshold
+                    )
+                    pipeline.named_steps["model"].fit(
+                        X_train_t, y_fit, eval_set=(X_eval_t, y_val_threshold)
+                    )
+                else:
+                    pipeline.named_steps["model"].fit(X_train_t, y_fit)
             else:
-                pipeline.fit(X_train, y_train)
+                fit_kwargs = {}
+                if model_name == "hgb" and task_type in {"binary", "categorical"}:
+                    fit_kwargs["model__sample_weight"] = sample_weight_from_y(y_fit)
+                pipeline.fit(X_fit, y_fit, **fit_kwargs)
 
             fit_seconds = round(perf_counter() - start_time, 3)
 
+            selected_threshold = None
+            threshold_selection = None
+            if (
+                task_type == "binary"
+                and X_val_threshold is not None
+                and hasattr(pipeline, "predict_proba")
+            ):
+                y_val_prob = pipeline.predict_proba(X_val_threshold)
+                pos_idx = 1 if y_val_prob.shape[1] > 1 else 0
+                classes = getattr(
+                    pipeline.named_steps["model"], "classes_", np.unique(y_val_threshold)
+                )
+                pos_label = classes[pos_idx]
+                y_val_bin = (y_val_threshold == pos_label).astype(int).to_numpy()
+                threshold_selection = select_binary_threshold(
+                    y_val_bin,
+                    y_val_prob[:, pos_idx],
+                    min_recall=args.min_recall,
+                    beta=args.f_beta,
+                    fn_cost=args.fn_cost,
+                    fp_cost=args.fp_cost,
+                )
+                selected_threshold = threshold_selection["threshold"]
+                logger.info(
+                    "Model %s selected threshold=%.3f (val recall=%.3f, precision=%.3f, meets_recall=%s)",
+                    model_name,
+                    selected_threshold,
+                    threshold_selection["recall"],
+                    threshold_selection["precision"],
+                    threshold_selection["meets_recall_constraint"],
+                )
+
             metrics, plot_data = evaluate_and_save(
-                model_name, pipeline, X_test, y_test, task_type, out_dir
+                model_name,
+                pipeline,
+                X_test,
+                y_test,
+                task_type,
+                out_dir,
+                args.feature_importance,
+                decision_threshold=selected_threshold,
+                threshold_selection=threshold_selection,
+                f_beta=args.f_beta,
+                fn_cost=args.fn_cost,
+                fp_cost=args.fp_cost,
             )
 
             row = {"model": model_name, "status": "ok", "fit_seconds": fit_seconds}

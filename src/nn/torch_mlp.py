@@ -34,6 +34,8 @@ class _TorchMLPBase(BaseEstimator):
         random_state: int = 42,
         device: str = "auto",
         verbose: bool = False,
+        pos_weight: float | None = None,
+        class_weights: tuple[float, ...] | None = None,
     ) -> None:
         self.hidden_layers = hidden_layers
         self.activation = activation
@@ -46,6 +48,8 @@ class _TorchMLPBase(BaseEstimator):
         self.random_state = random_state
         self.device = device
         self.verbose = verbose
+        self.pos_weight = pos_weight
+        self.class_weights = class_weights
 
     def _build_network(self, input_dim: int, output_dim: int, nn) -> Any:
         activation_map = {
@@ -149,11 +153,24 @@ class TorchMLPClassifier(_TorchMLPBase, ClassifierMixin):
 
         if n_classes == 2:
             self.model_ = self._build_network(self.n_features_in_, 1, nn)
-            criterion = nn.BCEWithLogitsLoss()
+            if self.pos_weight is not None:
+                pos_w = torch.tensor(
+                    [float(self.pos_weight)], dtype=torch.float32, device=self.device_
+                )
+                criterion = nn.BCEWithLogitsLoss(pos_weight=pos_w)
+            else:
+                criterion = nn.BCEWithLogitsLoss()
             y_tensor = torch.tensor(y_idx.astype(np.float32)).view(-1, 1)
         else:
             self.model_ = self._build_network(self.n_features_in_, n_classes, nn)
-            criterion = nn.CrossEntropyLoss()
+            weight_tensor = None
+            if self.class_weights is not None and len(self.class_weights) == n_classes:
+                weight_tensor = torch.tensor(
+                    [float(w) for w in self.class_weights],
+                    dtype=torch.float32,
+                    device=self.device_,
+                )
+            criterion = nn.CrossEntropyLoss(weight=weight_tensor)
             y_tensor = torch.tensor(y_idx.astype(np.int64))
 
         X_tensor = torch.tensor(X_np, dtype=torch.float32)

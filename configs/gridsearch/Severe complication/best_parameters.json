@@ -1,0 +1,50 @@
+{
+    "hgb": {
+        "l2_regularization": 1.0,
+        "learning_rate": 0.01,
+        "max_depth": null,
+        "max_iter": 1000
+    },
+    "rf": {
+        "max_depth": 10,
+        "max_features": "sqrt",
+        "min_samples_leaf": 1,
+        "n_estimators": 300,
+        "class_weight": {
+            "false": 0.5412262156448203,
+            "true": 6.564102564102564
+        }
+    },
+    "lr": {
+        "C": 100.0,
+        "max_iter": 2000,
+        "solver": "lbfgs",
+        "class_weight": {
+            "false": 0.5412262156448203,
+            "true": 6.564102564102564
+        }
+    },
+    "ridge": null,
+    "svc": {
+        "C": 100.0,
+        "gamma": "scale",
+        "kernel": "linear",
+        "probability": true,
+        "class_weight": {
+            "false": 0.5412262156448203,
+            "true": 6.564102564102564
+        }
+    },
+    "torch_mlp": {
+        "batch_size": 64,
+        "dropout": 0.4,
+        "epochs": 150,
+        "hidden_layers": [
+            64,
+            32
+        ],
+        "learning_rate": 0.0001,
+        "weight_decay": 0.0,
+        "pos_weight": 12.128205128205128
+    }
+}

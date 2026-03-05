@@ -1,0 +1,101 @@
+Feature,Importance,Std
+Center,0.08305014504765848,0.02099544854145903
+Radio_Pre-Op max_axial_diam_mm,0.03224202237878156,0.0231800795616105
+Symptoms_Motor deficits,0.028760878574388714,0.009190827203069442
+Symptoms_Aphasia/dysartria,0.026440116038126814,0.014015549519313207
+Symptoms_Incidental finding,0.02246166597596344,0.004857052738991671
+Pre-Op KPS,0.022295897223373308,0.03815689186321833
+Symptoms_CN deficits,0.018731869042685444,0.005684684028009031
+Symptoms_Hyperprolatinemia,0.013593037712391176,0.006648339703325445
+Charlson Comorbidity Index,0.012681309573145394,0.010453293943861896
+Optic nerve/chiasm compression,0.011769581433899657,0.0010014957292659853
+Simpson Grade,0.009863240779113113,0.003038591426410823
+Radio_Edema,0.008288437629506817,0.00647878068656868
+Sex,0.007956900124326528,0.010975218492870397
+Date of Birth,0.0055532532117695595,0.0026026222077260848
+Symptoms_Seizure,0.004807293825113956,0.0027564507498244596
+EOR,0.004807293825113889,0.0036185462002392152
+Age,0.004558640696228777,0.0063664697454360415
+ASA,0.004475756319933688,0.0016864475714360532
+Radio_Tumor side,0.0034811438043929055,0.001690516208402097
+Symptoms_Cognitive/psychiatrist disorder,0.002652300041442168,0.004239274547051617
+Date of surgery,0.002320762536261922,0.003618546200239194
+Symptoms_Visual deficits,0.0018234562784914753,0.0061502217850274805
+Symptoms_Acute onset (1<month),0.0009946125155407826,0.007856984219579975
+Clinical_Status_30d,0.0,0.0
+PS_Discharge,0.0,0.0
+KPS_discharge,0.0,0.0
+LOS > 7 days,0.0,0.0
+LOS > 4 days,0.0,0.0
+LOS (days),0.0,0.0
+complications_30d,0.0,0.0
+KPS_Discharge Improved,0.0,0.0
+KPS_Discharge Worsened,0.0,0.0
+X,0.0,0.0
+Notes,0.0,0.0
+Clinical_Status_12m,0.0,0.0
+Clinical_Status_6m,0.0,0.0
+WHO grade,0.0,0.0
+Complications (Y/N),0.0,0.0
+Complication (number),0.0,0.0
+Systemic infection,0.0,0.0
+Wound infection,0.0,0.0
+Seizure,0.0,0.0
+Hydrocephalus,0.0,0.0
+DVT,0.0,0.0
+Haematoma,0.0,0.0
+Acute respiratory insufficiency,0.0,0.0
+Heart failure,0.0,0.0
+New Stroke,0.0,0.0
+CSF leak,0.0,0.0
+Complication treatment,0.0,0.0
+ICU (for complication),0.0,0.0
+Single/multiple Organ failure,0.0,0.0
+Ibañez complication class,0.0,0.0
+Severe complication,0.0,0.0
+New neurological deficits,0.0,0.0
+Visual deficit,0.0,0.0
+Psychiatric syndrome,0.0,0.0
+Cognitive Decline,0.0,0.0
+Motor Deficits,0.0,0.0
+CNs V/VII/VIII involvment,0.0,0.0
+ACA encasement,0.0,0.0
+ACA compression,0.0,0.0
+MCA encasement,0.0,0.0
+MCA compression,0.0,0.0
+ACA/MCA/PCA involvment,0.0,0.0
+CNs III/IV/VI involvment,0.0,0.0
+Complete asportation,0.0,0.0
+"CNs IX, X, XI involvment",0.0,0.0
+"SCA, AICA, PICA involvment",0.0,0.0
+Radio_Ventricle involment,0.0,0.0
+Radio_Midline shift entity,0.0,0.0
+Radio_Midline shift,0.0,0.0
+Radio_Hyperostosis,0.0,0.0
+Radio_Dural_tail,0.0,0.0
+Radio_Bone_invasion,0.0,0.0
+Radio_Calcification,0.0,0.0
+Surgery_Duration_min,0.0,0.0
+Optic Canal invasion,0.0,0.0
+Radio_Vessel_encasement,0.0,0.0
+Radio_Cystic_necrosis,0.0,0.0
+ICA/Syphon involvment,0.0,0.0
+Cavernous sinus involvement,0.0,0.0
+ICA encasement,0.0,0.0
+ICA compression,0.0,0.0
+Comorbidities_Hypertension,0.0,0.0
+Brainstem compression,0.0,0.0
+Radio_Tumor Location,0.0,0.0
+Comorbidities_Cardiorespiratory,0.0,0.0
+Comorbidities_Hyperlipidemia,0.0,0.0
+Comorbidities_Obesity,0.0,0.0
+Comorbidities_DVT,0.0,0.0
+Comorbidities_DM,0.0,0.0
+Split,0.0,0.0
+Comorbidities,0.0,0.0
+Comorbidities_Prior Stroke,0.0,0.0
+Comorbidities_Other Tumors,0.0,0.0
+ID,0.0,0.0
+Surgical Approach,-0.00041442188147535754,0.003526240760245757
+Symptoms_Headache,-0.0017405719021964306,0.006648339703325495
+Symptoms_Nausea/Vomit,-0.004475756319933688,0.0012124938945982352
