@@ -1,0 +1,40 @@
+{
+    "input_file": "./data/SBM1212.xlsx",
+    "input_features": [
+        "Sex",
+        "Pre-Op KPS",
+        "Radio_Pre-Op max_axial_diam_mm",
+        "Radio_Edema",
+        "Charlson Comorbidity Index",
+        "Age",
+        "ASA",
+        "Symptoms_Incidental finding",
+        "Symptoms_Acute onset (1<month)",
+        "Symptoms_Seizure",
+        "Symptoms_Headache",
+        "Symptoms_Motor deficits",
+        "Symptoms_Aphasia/dysartria",
+        "Symptoms_CN deficits",
+        "Symptoms_Nausea/Vomit",
+        "Symptoms_Visual deficits",
+        "Symptoms_Cognitive/psychiatrist disorder",
+        "Symptoms_Hyperprolatinemia",
+        "Optic nerve/chiasm compression",
+        "Center",
+        "Radio_Tumor side",
+        "Surgical Approach",
+        "Simpson Grade",
+        "EOR",
+        "Date of Birth",
+        "Date of surgery"
+    ],
+    "cols_string": [
+        "Center",
+        "Radio_Tumor side",
+        "Surgical Approach",
+        "Simpson Grade",
+        "EOR"
+    ],
+    "cols_date": ["Date of Birth", "Date of surgery"],
+    "cols_multi": []
+}

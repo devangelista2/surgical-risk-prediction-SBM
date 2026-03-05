@@ -1,0 +1,19 @@
+{
+    "input_file": "./data/SBM1212.xlsx",
+    "input_features": [
+        "Pre-Op KPS",
+        "Age",
+        "ICA encasement",
+        "Symptoms_Acute onset (1<month)",
+        "Comorbidities"
+    ],
+    "cols_string": [
+        "Center",
+        "Radio_Tumor side",
+        "Surgical Approach",
+        "Simpson Grade",
+        "EOR"
+    ],
+    "cols_date": ["Date of Birth", "Date of surgery"],
+    "cols_multi": []
+}

@@ -1,0 +1,37 @@
+{
+    "hgb": {
+        "l2_regularization": 0.0,
+        "learning_rate": 0.01,
+        "max_depth": 5,
+        "max_iter": 300
+    },
+    "rf": {
+        "max_depth": 10,
+        "max_features": "log2",
+        "min_samples_leaf": 4,
+        "n_estimators": 300
+    },
+    "lr": {
+        "C": 100.0,
+        "max_iter": 2000,
+        "solver": "liblinear"
+    },
+    "ridge": null,
+    "svc": {
+        "C": 100.0,
+        "gamma": "scale",
+        "kernel": "linear",
+        "probability": true
+    },
+    "torch_mlp": {
+        "batch_size": 32,
+        "dropout": 0.4,
+        "epochs": 150,
+        "hidden_layers": [
+            128,
+            64
+        ],
+        "learning_rate": 0.0005,
+        "weight_decay": 0.0
+    }
+}
