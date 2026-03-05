@@ -1,5 +1,5 @@
 {
-  "generated_at_utc": "2026-03-05T15:08:46.272672+00:00",
+  "generated_at_utc": "2026-03-05T21:48:57.047608+00:00",
   "source_file_name": "SBM1212.xlsx",
   "columns": {
     "Center": [
@@ -13,30 +13,6 @@
       "GTR=Gross total",
       "NTR=Near-total",
       "STR=Subtotal"
-    ],
-    "Radio_Tumor side": [
-      "Bilateral",
-      "Left",
-      "Midline",
-      "Right"
-    ],
-    "Simpson Grade": [
-      "I",
-      "II",
-      "III",
-      "IV",
-      "V"
-    ],
-    "Surgical Approach": [
-      "Endoscopic endonasal",
-      "Far lateral",
-      "Orbitozygomatic",
-      "Pterional",
-      "Retrosigmoid",
-      "Subfrontal/Bilateral",
-      "Suboccipital",
-      "Temporal",
-      "Two stage"
     ]
   }
 }

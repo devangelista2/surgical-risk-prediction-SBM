@@ -15,6 +15,7 @@ BASE_DIR = Path(__file__).resolve().parent
 SRC_DIR = BASE_DIR / "src"
 OUTPUTS_ROOT = BASE_DIR / "outputs"
 CATEGORY_OPTIONS_FILE = OUTPUTS_ROOT / "category_options.json"
+APP_FEATURE_CONFIG_FILE = BASE_DIR / "configs" / "preoperative_reduced.json"
 
 # Needed so joblib can resolve custom classes (e.g., torch models in src/nn).
 if str(SRC_DIR) not in sys.path:
@@ -32,6 +33,15 @@ def ensure_list(value: Any) -> list[str]:
     if isinstance(value, str):
         return [value]
     return []
+
+
+@st.cache_data
+def load_json_file(path: str) -> dict[str, Any]:
+    json_path = Path(path)
+    if not json_path.exists():
+        return {}
+    with open(json_path, "r", encoding="utf-8") as file:
+        return json.load(file)
 
 
 @st.cache_data
@@ -288,6 +298,9 @@ target_dir = OUTPUTS_ROOT / target
 
 metadata = load_metadata(str(target_dir / "metadata.json"))
 data_config = metadata.get("data_configuration", {})
+ui_config = load_json_file(str(APP_FEATURE_CONFIG_FILE))
+if ui_config:
+    data_config = ui_config
 
 model_names = sorted(models_map[target].keys())
 model_name = st.sidebar.selectbox("Model", model_names)
@@ -308,6 +321,10 @@ if not model_features:
     st.stop()
 
 features = model_features
+if APP_FEATURE_CONFIG_FILE.exists():
+    st.sidebar.success(f"UI feature config: {APP_FEATURE_CONFIG_FILE.name}")
+else:
+    st.sidebar.warning("UI feature config not found; using model metadata.")
 st.sidebar.caption(f"Strict mode: showing only model features ({len(features)})")
 with st.sidebar.expander("Model features in use"):
     st.write(features)
@@ -329,44 +346,67 @@ else:
 
 st.subheader("Patient Data Entry")
 with st.form("patient_form"):
-    col1, col2, col3 = st.columns(3)
     values: dict[str, Any] = {}
 
-    for idx, feature in enumerate(features):
-        col = [col1, col2, col3][idx % 3]
-        with col:
-            if feature in cols_date_set:
-                values[feature] = st.date_input(
-                    feature,
-                    value=date.today(),
-                    min_value=date(1900, 1, 1),
-                    max_value=date(2100, 12, 31),
-                    key=f"date_{feature}",
-                )
-            elif feature in cols_string_set:
-                options = categories.get(feature, [])
-                if options:
-                    values[feature] = st.selectbox(
+    selectable_features = []
+    numeric_features = []
+    for feature in features:
+        if (
+            feature in cols_string_set
+            or feature in cols_date_set
+            or feature in cols_multi_set
+            or is_symptom_feature(feature)
+        ):
+            selectable_features.append(feature)
+        else:
+            numeric_features.append(feature)
+
+    if selectable_features:
+        st.markdown("**Selectable / Categorical Fields**")
+        sel_col1, sel_col2 = st.columns(2)
+        for idx, feature in enumerate(selectable_features):
+            col = [sel_col1, sel_col2][idx % 2]
+            with col:
+                if feature in cols_date_set:
+                    values[feature] = st.date_input(
                         feature,
-                        options=[""] + options,
-                        index=0,
-                        key=f"str_{feature}",
+                        value=date.today(),
+                        min_value=date(1900, 1, 1),
+                        max_value=date(2100, 12, 31),
+                        key=f"date_{feature}",
+                    )
+                elif feature in cols_string_set:
+                    options = categories.get(feature, [])
+                    if options:
+                        values[feature] = st.selectbox(
+                            feature,
+                            options=[""] + options,
+                            index=0,
+                            key=f"str_{feature}",
+                        )
+                    else:
+                        values[feature] = st.text_input(
+                            feature,
+                            value="",
+                            key=f"text_{feature}",
+                        )
+                elif feature in cols_multi_set:
+                    values[feature] = st.text_input(
+                        f"{feature} (multi)",
+                        value="",
+                        key=f"multi_{feature}",
                     )
                 else:
-                    values[feature] = st.text_input(
-                        feature,
-                        value="",
-                        key=f"text_{feature}",
+                    values[feature] = st.checkbox(
+                        feature, value=False, key=f"check_{feature}"
                     )
-            elif feature in cols_multi_set:
-                values[feature] = st.text_input(
-                    f"{feature} (multi)",
-                    value="",
-                    key=f"multi_{feature}",
-                )
-            elif is_symptom_feature(feature):
-                values[feature] = st.checkbox(feature, value=False, key=f"check_{feature}")
-            else:
+
+    if numeric_features:
+        st.markdown("**Numeric Fields**")
+        num_col1, num_col2 = st.columns(2)
+        for idx, feature in enumerate(numeric_features):
+            col = [num_col1, num_col2][idx % 2]
+            with col:
                 low_feature = feature.lower()
                 if low_feature == "age":
                     default_age = int(round(default_numeric(feature, 60, feature_defaults)))
@@ -387,21 +427,6 @@ with st.form("patient_form"):
                         value=default_kps,
                         key=f"slider_{feature}",
                     )
-                elif low_feature == "sex":
-                    sex_options = categories.get(feature, [])
-                    if sex_options:
-                        values[feature] = st.selectbox(
-                            "Sex",
-                            options=[""] + sex_options,
-                            index=0,
-                            key=f"sex_{feature}",
-                        )
-                    else:
-                        values[feature] = st.selectbox(
-                            "Sex (0=M, 1=F)",
-                            [0, 1],
-                            key=f"sex_{feature}",
-                        )
                 else:
                     values[feature] = st.number_input(
                         feature,
