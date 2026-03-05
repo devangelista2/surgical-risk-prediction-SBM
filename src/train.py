@@ -584,6 +584,16 @@ def main():
 
     logger.info(f"Data split successful: {len(X_train)} Train, {len(X_test)} Test")
 
+    # Keep only configured model inputs to avoid reporting/importancing dropped columns.
+    input_features = data_config["input_features"]
+    missing_features = [c for c in input_features if c not in df.columns]
+    if missing_features:
+        raise ValueError(
+            f"These input_features are missing from dataset: {missing_features}"
+        )
+    X_train = X_train[input_features].copy()
+    X_test = X_test[input_features].copy()
+
     X_fit, y_fit = X_train, y_train
     X_val_threshold, y_val_threshold = None, None
 

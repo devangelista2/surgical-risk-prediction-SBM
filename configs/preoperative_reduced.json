@@ -1,0 +1,23 @@
+{
+    "input_file": "./data/SBM1212.xlsx",
+    "input_features": [
+        "Center",
+        "Radio_Pre-Op max_axial_diam_mm",
+        "Date of Birth",
+        "Symptoms_CN deficits",
+        "Symptoms_Motor deficits",
+        "Symptoms_Aphasia/dysartria",
+        "Symptoms_Seizure",
+        "Symptoms_Hyperprolatinemia",
+        "Pre-Op KPS",
+        "EOR",
+        "Radio_Edema",
+        "Charlson Comorbidity Index"
+    ],
+    "cols_string": [
+        "Center",
+        "EOR"
+    ],
+    "cols_date": ["Date of Birth"],
+    "cols_multi": []
+}

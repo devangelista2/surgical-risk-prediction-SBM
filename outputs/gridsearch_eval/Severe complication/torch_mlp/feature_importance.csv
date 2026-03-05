@@ -1,101 +1,13 @@
 Feature,Importance,Std
-Radio_Tumor side,0.01369863013698629,0.00968639426282941
-Surgical Approach,0.010958904109589041,0.00929086299058255
-Symptoms_Aphasia/dysartria,0.010958904109589019,0.009290862990582545
-Radio_Edema,0.00821917808219177,0.005125558064073866
-Symptoms_Acute onset (1<month),0.00821917808219177,0.007987605335404503
-Symptoms_Hyperprolatinemia,0.0068493150684931555,0.004331887205710091
-Symptoms_Cognitive/psychiatrist disorder,0.0068493150684931555,0.007503048732947471
-Symptoms_Seizure,0.005479452054794542,0.002739726027397271
-Charlson Comorbidity Index,0.005479452054794498,0.01178400721512689
-Symptoms_Nausea/Vomit,0.0041095890410959065,0.00335546540107286
-Symptoms_CN deficits,0.004109589041095885,0.0069849582377983326
-Symptoms_Visual deficits,0.002739726027397249,0.006984958237798328
-Radio_Pre-Op max_axial_diam_mm,0.002739726027397227,0.014103602932858915
-Simpson Grade,0.002739726027397227,0.009290862990582544
-Symptoms_Motor deficits,0.0013698630136986135,0.007987605335404518
-Clinical_Status_30d,0.0,0.0
-Visual deficit,0.0,0.0
-New neurological deficits,0.0,0.0
-Severe complication,0.0,0.0
-Ibañez complication class,0.0,0.0
-Single/multiple Organ failure,0.0,0.0
-complications_30d,0.0,0.0
-KPS_Discharge Improved,0.0,0.0
-KPS_Discharge Worsened,0.0,0.0
-PS_Discharge,0.0,0.0
-KPS_discharge,0.0,0.0
-LOS > 7 days,0.0,0.0
-LOS > 4 days,0.0,0.0
-LOS (days),0.0,0.0
-Motor Deficits,0.0,0.0
-Cognitive Decline,0.0,0.0
-Psychiatric syndrome,0.0,0.0
-X,0.0,0.0
-Notes,0.0,0.0
-Clinical_Status_12m,0.0,0.0
-Clinical_Status_6m,0.0,0.0
-WHO grade,0.0,0.0
-Complications (Y/N),0.0,0.0
-Complication (number),0.0,0.0
-Systemic infection,0.0,0.0
-Wound infection,0.0,0.0
-Seizure,0.0,0.0
-Hydrocephalus,0.0,0.0
-DVT,0.0,0.0
-Haematoma,0.0,0.0
-Acute respiratory insufficiency,0.0,0.0
-Heart failure,0.0,0.0
-New Stroke,0.0,0.0
-CSF leak,0.0,0.0
-Complication treatment,0.0,0.0
-ICU (for complication),0.0,0.0
-Brainstem compression,0.0,0.0
-Radio_Calcification,0.0,0.0
-ICA compression,0.0,0.0
-Cavernous sinus involvement,0.0,0.0
-ICA/Syphon involvment,0.0,0.0
-Radio_Vessel_encasement,0.0,0.0
-Complete asportation,0.0,0.0
-"CNs IX, X, XI involvment",0.0,0.0
-CNs V/VII/VIII involvment,0.0,0.0
-ACA/MCA/PCA involvment,0.0,0.0
-ACA compression,0.0,0.0
-MCA encasement,0.0,0.0
-MCA compression,0.0,0.0
-ICA encasement,0.0,0.0
-CNs III/IV/VI involvment,0.0,0.0
-"SCA, AICA, PICA involvment",0.0,0.0
-ACA encasement,0.0,0.0
-Comorbidities,0.0,0.0
-Age,0.0,0.011461096253891426
-Radio_Midline shift entity,0.0,0.0
-Radio_Ventricle involment,0.0,0.0
-Radio_Hyperostosis,0.0,0.0
-Radio_Dural_tail,0.0,0.0
-Radio_Bone_invasion,0.0,0.0
-Radio_Midline shift,0.0,0.0
-Optic Canal invasion,0.0,0.0
-Surgery_Duration_min,0.0,0.0
-Radio_Cystic_necrosis,0.0,0.0
-Radio_Tumor Location,0.0,0.0
-Comorbidities_Hypertension,0.0,0.0
-Comorbidities_DVT,0.0,0.0
-Comorbidities_DM,0.0,0.0
-Comorbidities_Obesity,0.0,0.0
-Comorbidities_Other Tumors,0.0,0.0
-Comorbidities_Prior Stroke,0.0,0.0
-Split,0.0,0.0
-ID,0.0,0.0
-Comorbidities_Cardiorespiratory,0.0,0.0
-Comorbidities_Hyperlipidemia,0.0,0.0
-ASA,-2.2204460492503132e-17,0.007503048732947471
-EOR,-2.2204460492503132e-17,0.009686394262829426
-Symptoms_Headache,-0.0013698630136986356,0.0051255580640739125
-Date of surgery,-0.002739726027397271,0.0033554654010728604
-Optic nerve/chiasm compression,-0.0041095890410959065,0.005479452054794542
-Pre-Op KPS,-0.008219178082191792,0.02050223225629557
-Date of Birth,-0.008219178082191813,0.0051255580640739125
-Center,-0.010958904109589041,0.012703586980131106
-Symptoms_Incidental finding,-0.012328767123287699,0.005125558064073877
-Sex,-0.015068493150684948,0.007987605335404503
+Symptoms_Aphasia/dysartria,0.03150684931506855,0.009290862990582544
+EOR,0.021917808219178124,0.007987605335404503
+Symptoms_Motor deficits,0.008219178082191792,0.010066396203218538
+Symptoms_Hyperprolatinemia,0.005479452054794542,0.0027397260273972716
+Center,0.005479452054794542,0.0051255580640739125
+Date of Birth,0.001369863013698658,0.011784007215126891
+Radio_Edema,4.4408920985006264e-17,0.0061262136369857004
+Charlson Comorbidity Index,-0.0054794520547944755,0.011784007215126888
+Symptoms_Seizure,-0.012328767123287631,0.011784007215126896
+Pre-Op KPS,-0.016438356164383494,0.019661233006037424
+Symptoms_CN deficits,-0.021917808219178037,0.007987605335404518
+Radio_Pre-Op max_axial_diam_mm,-0.03013698630136983,0.010251116128147778

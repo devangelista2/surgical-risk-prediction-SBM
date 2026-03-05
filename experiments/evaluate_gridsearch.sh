@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Edit only these variables
-DATA_CONFIG="configs/old_test.json"
+DATA_CONFIG="configs/preoperative_reduced.json"
 GRIDSEARCH_DIR="configs/gridsearch"
 OUTPUT_ROOT="outputs/gridsearch_eval"
 TRAIN_SCRIPT="src/train.py"

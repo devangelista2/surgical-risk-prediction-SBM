@@ -1,20 +1,20 @@
 {
-    "threshold": 0.029797979797979796,
+    "threshold": 0.02484848484848485,
     "f_beta": 2.0,
     "fn_cost": 1.0,
     "fp_cost": 5.0,
     "selection_on_validation": {
-        "tn": 11,
-        "fp": 88,
+        "tn": 20,
+        "fp": 79,
         "fn": 0,
         "tp": 17,
         "recall": 1.0,
-        "precision": 0.1619047619047619,
-        "specificity": 0.1111111111111111,
+        "precision": 0.17708333333333334,
+        "specificity": 0.20202020202020202,
         "npv": 1.0,
-        "f_beta": 0.49132947976878616,
-        "expected_cost": 440.0,
-        "threshold": 0.029797979797979796,
+        "f_beta": 0.5182926829268293,
+        "expected_cost": 395.0,
+        "threshold": 0.02484848484848485,
         "meets_recall_constraint": true
     }
 }

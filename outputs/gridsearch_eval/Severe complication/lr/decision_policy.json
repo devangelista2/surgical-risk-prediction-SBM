@@ -1,5 +1,5 @@
 {
-    "threshold": 0.014949494949494949,
+    "threshold": 0.02484848484848485,
     "f_beta": 2.0,
     "fn_cost": 1.0,
     "fp_cost": 5.0,
@@ -14,7 +14,7 @@
         "npv": 1.0,
         "f_beta": 0.2654867256637168,
         "expected_cost": 415.0,
-        "threshold": 0.014949494949494949,
+        "threshold": 0.02484848484848485,
         "meets_recall_constraint": true
     }
 }
