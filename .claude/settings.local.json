@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(C:\\\\Users\\\\tivog\\\\surgical-risk-prediction-SBM\\\\.venv\\\\Scripts\\\\python.exe -c \"import flask; print\\(flask.__version__\\)\" 2>&1)",
+      "Bash(.venv/Scripts/python.exe -c \"import flask; print\\(flask.__version__\\)\" 2>&1)",
+      "Bash(.venv/Scripts/pip.exe install:*)",
+      "Bash(.venv/Scripts/python.exe -m pip install flask)",
+      "Bash(python3 -m pip install flask --target \"/c/Users/tivog/surgical-risk-prediction-SBM/.venv/Lib/site-packages\")",
+      "Bash(where python:*)",
+      "Bash(where py:*)",
+      "Read(//c/Users/tivog/AppData/Local/Programs/**)",
+      "Bash(\"/c/Users/tivog/anaconda3/python.exe\" -m pip install flask)",
+      "Bash(\"/c/Users/tivog/anaconda3/python.exe\" -m pip install flask --target \".venv/Lib/site-packages\")",
+      "Bash(.venv/Scripts/python.exe -c \"import flask; print\\(flask.__version__\\)\")",
+      "Bash(.venv/Scripts/python.exe -c \"import flask; import pandas; import numpy; print\\(''OK''\\)\")",
+      "Bash(timeout 5 .venv/Scripts/python.exe -c \":*)",
+      "Bash(timeout 8 .venv/Scripts/python.exe -c \":*)"
+    ]
+  }
+}

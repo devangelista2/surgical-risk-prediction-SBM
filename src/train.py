@@ -1,9 +1,12 @@
 import argparse
 import json
+import os
 import warnings
 from datetime import datetime
 from pathlib import Path
 from time import perf_counter
+
+os.environ.setdefault("LOKY_MAX_CPU_COUNT", "1")
 
 import joblib
 import numpy as np
@@ -56,6 +59,16 @@ warnings.filterwarnings("ignore", category=UserWarning)
 def load_json(path: str) -> dict:
     with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
+
+
+def write_progress(path: Path | None, payload: dict) -> None:
+    if path is None:
+        return
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = path.with_suffix(path.suffix + ".tmp")
+    with open(tmp_path, "w", encoding="utf-8") as f:
+        json.dump(payload, f, indent=2)
+    os.replace(tmp_path, path)
 
 
 def build_preprocessor(
@@ -387,7 +400,13 @@ def evaluate_and_save(
                 scoring = "r2"
 
             pi_results = permutation_importance(
-                pipeline, X_test, y_test, scoring=scoring, n_repeats=5, random_state=42
+                pipeline,
+                X_test,
+                y_test,
+                scoring=scoring,
+                n_repeats=5,
+                random_state=42,
+                n_jobs=1,
             )
             features = X_test.columns.tolist()
             importances_mean = pi_results.importances_mean
@@ -501,10 +520,16 @@ def main():
         default=1.0,
         help="Relative cost of false positives for threshold selection.",
     )
+    parser.add_argument(
+        "--progress_path",
+        default=None,
+        help="Optional JSON file path used to report training progress.",
+    )
     args = parser.parse_args()
 
     out_dir = Path(args.output_folder)
     out_dir.mkdir(parents=True, exist_ok=True)
+    progress_path = Path(args.progress_path) if args.progress_path else None
 
     data_config = load_json(args.data_config)
     models_config = load_json(args.model_config)
@@ -518,6 +543,20 @@ def main():
         }
     else:
         models_to_train = {k: v for k, v in models_config.items() if isinstance(v, dict)}
+
+    write_progress(
+        progress_path,
+        {
+            "status": "running",
+            "target": args.target,
+            "total_models": len(models_to_train),
+            "completed_models": 0,
+            "current_model": None,
+            "current_step": "Loading data...",
+            "message": "Loading dataset and preparing split...",
+            "updated_at": datetime.utcnow().isoformat(timespec="seconds") + "Z",
+        },
+    )
 
     input_file_path = data_config["input_file"]
     logger.info(f"Loading data from {input_file_path}...")
@@ -674,6 +713,19 @@ def main():
     for model_name, params in pbar:
         pbar.set_postfix({"Current Model": model_name})
         start_time = perf_counter()
+        write_progress(
+            progress_path,
+            {
+                "status": "running",
+                "target": args.target,
+                "total_models": len(models_to_train),
+                "completed_models": len(benchmark_results),
+                "current_model": model_name,
+                "current_step": f"Training {model_name}...",
+                "message": f"Training model {model_name} ({len(benchmark_results) + 1}/{len(models_to_train)})",
+                "updated_at": datetime.utcnow().isoformat(timespec="seconds") + "Z",
+            },
+        )
 
         try:
             tuned_params = apply_imbalance_strategy(model_name, task_type, params, y_fit)
@@ -770,6 +822,19 @@ def main():
                 {k: v for k, v in metrics.items() if not isinstance(v, (list, dict))}
             )
             benchmark_results.append(row)
+            write_progress(
+                progress_path,
+                {
+                    "status": "running",
+                    "target": args.target,
+                    "total_models": len(models_to_train),
+                    "completed_models": len(benchmark_results),
+                    "current_model": model_name,
+                    "current_step": f"Completed {model_name}.",
+                    "message": f"Completed model {model_name} ({len(benchmark_results)}/{len(models_to_train)})",
+                    "updated_at": datetime.utcnow().isoformat(timespec="seconds") + "Z",
+                },
+            )
 
             # Save plotting data for the combined charts
             if "y_prob_pos" in plot_data:
@@ -785,6 +850,19 @@ def main():
                     "error": str(e),
                     "fit_seconds": round(perf_counter() - start_time, 3),
                 }
+            )
+            write_progress(
+                progress_path,
+                {
+                    "status": "running",
+                    "target": args.target,
+                    "total_models": len(models_to_train),
+                    "completed_models": len(benchmark_results),
+                    "current_model": model_name,
+                    "current_step": f"Failed {model_name}.",
+                    "message": f"Model {model_name} failed ({len(benchmark_results)}/{len(models_to_train)})",
+                    "updated_at": datetime.utcnow().isoformat(timespec="seconds") + "Z",
+                },
             )
 
     summary_df = pd.DataFrame(benchmark_results)
@@ -809,6 +887,19 @@ def main():
     print("\n" + "=" * 50)
     logger.info(f"Benchmark complete! Summary and plots saved to {out_dir}")
     print("=" * 50 + "\n")
+    write_progress(
+        progress_path,
+        {
+            "status": "completed",
+            "target": args.target,
+            "total_models": len(models_to_train),
+            "completed_models": len(models_to_train),
+            "current_model": None,
+            "current_step": "Training completed.",
+            "message": f"Completed target {args.target}.",
+            "updated_at": datetime.utcnow().isoformat(timespec="seconds") + "Z",
+        },
+    )
 
 
 if __name__ == "__main__":

@@ -1,0 +1,129 @@
+2026-04-20 16:22:13 - INFO - Loading data from ./data/SBM1212.xlsx...
+2026-04-20 16:22:14 - INFO - Target: 'New neurological deficits' | Inferred task type: binary
+2026-04-20 16:22:14 - INFO - Applying 'temporal' split strategy...
+2026-04-20 16:22:14 - INFO - Data split successful: 584 Train, 146 Test
+2026-04-20 16:22:14 - INFO - Pre-processing done. Found columns:
+  - ID
+  - Split
+  - Center
+  - Date of Birth
+  - Sex
+  - Age
+  - Date of surgery
+  - Comorbidities
+  - Comorbidities_Hyperlipidemia
+  - Comorbidities_Cardiorespiratory
+  - Comorbidities_Prior Stroke
+  - Comorbidities_Other Tumors
+  - Comorbidities_Hypertension
+  - Comorbidities_DVT
+  - Comorbidities_DM
+  - Comorbidities_Obesity
+  - Charlson Comorbidity Index
+  - ASA
+  - Symptoms_Incidental finding
+  - Symptoms_Acute onset (1<month)
+  - Symptoms_Seizure
+  - Symptoms_Headache
+  - Symptoms_Motor deficits
+  - Symptoms_Aphasia/dysartria
+  - Symptoms_CN deficits
+  - Symptoms_Nausea/Vomit
+  - Symptoms_Visual deficits
+  - Symptoms_Cognitive/psychiatrist disorder
+  - Symptoms_Hyperprolatinemia
+  - Pre-Op KPS
+  - Radio_Tumor Location
+  - Radio_Tumor side
+  - Radio_Pre-Op max_axial_diam_mm
+  - Radio_Ventricle involment
+  - Radio_Midline shift
+  - Radio_Midline shift entity
+  - Radio_Calcification
+  - Radio_Edema
+  - Radio_Dural_tail
+  - Radio_Hyperostosis
+  - Radio_Bone_invasion
+  - Radio_Vessel_encasement
+  - Radio_Cystic_necrosis
+  - Surgical Approach
+  - Surgery_Duration_min
+  - Optic Canal invasion
+  - Optic nerve/chiasm compression
+  - ICA/Syphon involvment
+  - ICA compression
+  - ICA encasement
+  - Cavernous sinus involvement
+  - ACA/MCA/PCA involvment
+  - MCA compression
+  - MCA encasement
+  - ACA compression
+  - ACA encasement
+  - SCA, AICA, PICA involvment
+  - Brainstem compression
+  - CNs III/IV/VI involvment
+  - CNs V/VII/VIII involvment
+  - CNs IX, X, XI involvment
+  - Simpson Grade
+  - EOR
+  - Complete asportation
+  - WHO grade
+  - Complications (Y/N)
+  - Complication (number)
+  - Systemic infection
+  - Wound infection
+  - Seizure
+  - Hydrocephalus
+  - DVT
+  - Haematoma
+  - Acute respiratory insufficiency
+  - Heart failure
+  - New Stroke
+  - CSF leak
+  - Complication treatment
+  - ICU (for complication)
+  - Single/multiple Organ failure
+  - Iba�ez complication class
+  - Severe complication
+  - New neurological deficits
+  - Visual deficit
+  - Psychiatric syndrome
+  - Cognitive Decline
+  - Motor Deficits
+  - LOS (days)
+  - LOS > 4 days
+  - LOS > 7 days
+  - KPS_discharge
+  - PS_Discharge
+  - KPS_Discharge Worsened
+  - KPS_Discharge Improved
+  - complications_30d
+  - Clinical_Status_30d
+  - Clinical_Status_6m
+  - Clinical_Status_12m
+  - Notes
+  - X
+2026-04-20 16:22:16 - INFO - Model hgb selected threshold=0.104 (val recall=0.968, precision=0.309, meets_recall=True)
+2026-04-20 16:22:22 - INFO - Model lr selected threshold=0.163 (val recall=0.968, precision=0.323, meets_recall=True)
+2026-04-20 16:22:26 - INFO - Model rf selected threshold=0.233 (val recall=0.903, precision=0.394, meets_recall=True)
+2026-04-20 16:22:34 - INFO - Model svc selected threshold=0.183 (val recall=0.903, precision=0.308, meets_recall=True)
+2026-04-20 16:22:44 - INFO - Model torch_mlp selected threshold=0.015 (val recall=0.839, precision=0.338, meets_recall=False)
+
+==================================================
+2026-04-20 16:22:48 - INFO - Benchmark complete! Summary and plots saved to C:\Users\tivog\surgical-risk-prediction-SBM\outputs\studio_runs\20260420-162207-studio-run\New neurological deficits
+==================================================
+
+
+
+Overall Training Progress:   0%|          | 0/5 [00:00<?, ?model/s]
+Overall Training Progress:   0%|          | 0/5 [00:00<?, ?model/s, Current Model=hgb]
+Overall Training Progress:  20%|##        | 1/5 [00:07<00:31,  7.91s/model, Current Model=hgb]
+Overall Training Progress:  20%|##        | 1/5 [00:07<00:31,  7.91s/model, Current Model=lr] 
+Overall Training Progress:  40%|####      | 2/5 [00:11<00:16,  5.42s/model, Current Model=lr]
+Overall Training Progress:  40%|####      | 2/5 [00:11<00:16,  5.42s/model, Current Model=rf]
+Overall Training Progress:  60%|######    | 3/5 [00:19<00:13,  6.62s/model, Current Model=rf]
+Overall Training Progress:  60%|######    | 3/5 [00:19<00:13,  6.62s/model, Current Model=svc]
+Overall Training Progress:  80%|########  | 4/5 [00:23<00:05,  5.57s/model, Current Model=svc]
+Overall Training Progress:  80%|########  | 4/5 [00:23<00:05,  5.57s/model, Current Model=torch_mlp]
+Overall Training Progress: 100%|##########| 5/5 [00:33<00:00,  7.00s/model, Current Model=torch_mlp]
+Overall Training Progress: 100%|##########| 5/5 [00:33<00:00,  6.63s/model, Current Model=torch_mlp]

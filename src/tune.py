@@ -42,6 +42,19 @@ def load_json(path: str) -> dict:
         return json.load(f)
 
 
+def validate_required_columns(df: pd.DataFrame, required_columns: list[str], context: str):
+    missing_columns = [col for col in required_columns if col not in df.columns]
+    if not missing_columns:
+        return
+
+    available_columns = ", ".join(df.columns.astype(str).tolist())
+    missing_list = ", ".join(missing_columns)
+    raise ValueError(
+        f"Missing required columns for {context}: {missing_list}\n"
+        f"Available dataset columns: {available_columns}"
+    )
+
+
 def build_preprocessor(input_features, cols_string, cols_date, cols_multi, use_scaler=True):
     transformers = []
 
@@ -338,6 +351,17 @@ def main():
             df = pd.read_csv(data_config["input_file"], encoding="latin1")
 
     col_output = args.target
+    validate_required_columns(df, [col_output], "target")
+    validate_required_columns(df, [args.date_column], "temporal split")
+
+    configured_columns = [
+        *data_config.get("input_features", []),
+        *data_config.get("cols_string", []),
+        *data_config.get("cols_date", []),
+        *data_config.get("cols_multi", []),
+    ]
+    validate_required_columns(df, list(dict.fromkeys(configured_columns)), "data_config")
+
     df = df.dropna(subset=[col_output, args.date_column]).copy()
 
     task_type = infer_task_type(df[col_output])

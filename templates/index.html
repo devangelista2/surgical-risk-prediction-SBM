@@ -1,0 +1,1391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MedModel Studio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ─────────────────────────────────────────────
+   FOUNDATION
+───────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --void:    #030810;
+  --ink:     #070E1C;
+  --surface: #0C1525;
+  --lift:    #111D30;
+  --raised:  #16243C;
+  --line:    rgba(255,255,255,.06);
+  --line-2:  rgba(255,255,255,.10);
+  --line-3:  rgba(255,255,255,.18);
+  --t1: #EFF6FF;
+  --t2: #94A3B8;
+  --t3: #4B5E76;
+  --cyan:   #22D3EE;
+  --blue:   #60A5FA;
+  --violet: #A78BFA;
+  --green:  #34D399;
+  --amber:  #FBBF24;
+  --red:    #F87171;
+  --indigo: #818CF8;
+  --r:    14px;
+  --r-sm:  8px;
+  --r-xs:  5px;
+  --pill: 9999px;
+}
+
+html { scroll-behavior: smooth; }
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,.1); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,.18); }
+
+body {
+  font-family: 'Inter', -apple-system, system-ui, sans-serif;
+  font-size: 13px; line-height: 1.6; color: var(--t1);
+  background-color: var(--void);
+  background-image:
+    radial-gradient(ellipse 70% 55% at 8% -5%,  rgba(99,102,241,.07) 0%, transparent 55%),
+    radial-gradient(ellipse 55% 40% at 92% 2%,  rgba(34,211,238,.05) 0%, transparent 50%),
+    radial-gradient(ellipse 90% 60% at 50% 110%, rgba(6,182,212,.04) 0%, transparent 55%);
+  min-height: 100vh; overflow-x: hidden;
+}
+
+/* ─────────────────────────────────────────────
+   TOPBAR
+───────────────────────────────────────────── */
+.topbar {
+  position: sticky; top: 0; z-index: 200;
+  height: 52px; display: flex; align-items: center; gap: .9rem;
+  padding: 0 1.75rem;
+  background: rgba(3,8,16,.82);
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  border-bottom: 1px solid var(--line);
+}
+.tb-brand { display: flex; align-items: center; gap: .7rem; text-decoration: none; flex-shrink: 0; }
+.tb-logomark {
+  width: 30px; height: 30px; display: block; flex-shrink: 0;
+  filter: drop-shadow(0 6px 16px rgba(34,211,238,.16));
+}
+.tb-namewrap { display: flex; flex-direction: column; gap: .02rem; line-height: 1; }
+.tb-name { font-size: .85rem; font-weight: 650; letter-spacing: -.02em; color: var(--t1); }
+.tb-tag { font-size: .58rem; text-transform: uppercase; letter-spacing: .14em; color: var(--t3); }
+.tb-sep  { width: 1px; height: 18px; background: var(--line-2); flex-shrink: 0; }
+.tb-nav  { display: flex; gap: .15rem; }
+.tbnav-btn {
+  display: flex; align-items: center; gap: .35rem;
+  padding: .32rem .8rem; border-radius: var(--pill);
+  border: none; background: transparent;
+  color: var(--t3); font-size: .78rem; font-weight: 500;
+  cursor: pointer; transition: all .15s; font-family: inherit;
+}
+.tbnav-btn .ndot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; opacity: .5; transition: all .15s; }
+.tbnav-btn.active { color: var(--t1); background: rgba(255,255,255,.07); }
+.tbnav-btn.active .ndot { background: var(--cyan); opacity: 1; box-shadow: 0 0 6px var(--cyan); }
+.tbnav-btn:hover:not(.active) { color: var(--t2); background: rgba(255,255,255,.04); }
+.tb-spacer { flex: 1; }
+.tb-pills { display: flex; gap: .4rem; align-items: center; }
+.tb-pill {
+  display: inline-flex; align-items: center; gap: .28rem;
+  padding: .18rem .6rem; border-radius: var(--pill);
+  border: 1px solid var(--line-2); background: rgba(255,255,255,.03);
+  color: var(--t3); font-size: .7rem; font-weight: 500;
+}
+.tb-pill .tp-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--cyan); }
+
+/* ─────────────────────────────────────────────
+   PAGE
+───────────────────────────────────────────── */
+.page { max-width: 1480px; margin: 0 auto; padding: 2rem 1.75rem 5rem; }
+.tab-section { display: none; }
+.tab-section.active { display: block; }
+
+.ph { margin-bottom: 1.75rem; margin-top: .25rem; }
+.ph-title {
+  font-size: 1.9rem; font-weight: 700; letter-spacing: -.06em; line-height: 1.05;
+  background: linear-gradient(135deg, #EFF6FF 30%, #5B7EA8 100%);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  margin-bottom: .3rem;
+}
+.ph-sub { color: var(--t3); font-size: .82rem; }
+
+/* ─────────────────────────────────────────────
+   CARDS
+───────────────────────────────────────────── */
+.card {
+  position: relative; overflow: hidden;
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--r); padding: 1.1rem 1.2rem;
+  transition: border-color .2s;
+}
+.card::after {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px;
+  background: linear-gradient(90deg, transparent 10%, rgba(255,255,255,.09) 50%, transparent 90%);
+  pointer-events: none;
+}
+.card:hover { border-color: var(--line-2); }
+.card-label { font-size: .65rem; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; color: var(--t3); margin-bottom: .65rem; }
+
+.sc {
+  position: relative; overflow: hidden;
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--r); padding: .85rem 1rem;
+  transition: border-color .2s, transform .2s;
+}
+.sc:hover { border-color: var(--line-2); transform: translateY(-1px); }
+.sc::after {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.08), transparent);
+}
+.sc-glow { position: absolute; bottom: -20px; right: -10px; width: 70px; height: 70px; border-radius: 50%; filter: blur(22px); opacity: .12; pointer-events: none; }
+.sc-label { font-size: .65rem; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; color: var(--t3); margin-bottom: .3rem; }
+.sc-value { font-size: 1.65rem; font-weight: 700; letter-spacing: -.05em; line-height: 1; color: var(--t1); margin-bottom: .18rem; font-family: 'JetBrains Mono', monospace; }
+.sc-cap { font-size: .72rem; color: var(--t3); }
+
+/* ─────────────────────────────────────────────
+   GRIDS
+───────────────────────────────────────────── */
+.g3  { display: grid; grid-template-columns: repeat(3,1fr); gap: .85rem; }
+.g5  { display: grid; grid-template-columns: repeat(5,1fr); gap: .65rem; }
+.g2  { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+.g2w { display: grid; grid-template-columns: 1.35fr .65fr; gap: 1.2rem; }
+.g4  { display: grid; grid-template-columns: repeat(4,1fr); gap: .65rem; }
+
+/* ─────────────────────────────────────────────
+   SECTION HEADING
+───────────────────────────────────────────── */
+.sh { margin-bottom: .85rem; }
+.sh-row { display: flex; align-items: baseline; gap: .6rem; margin-bottom: .2rem; }
+.sh-title { font-size: .9rem; font-weight: 600; letter-spacing: -.02em; color: var(--t1); }
+.sh-sub   { font-size: .76rem; color: var(--t3); }
+
+/* ─────────────────────────────────────────────
+   SELECTION PILLS  (targets / models)
+───────────────────────────────────────────── */
+.pill-group { display: flex; flex-wrap: wrap; gap: .38rem; margin: .6rem 0 .75rem; }
+.pill {
+  display: inline-flex; align-items: center; gap: .38rem;
+  padding: .3rem .72rem; border-radius: var(--pill);
+  border: 1px solid var(--line-2); background: rgba(255,255,255,.03);
+  color: var(--t3); font-size: .76rem; font-weight: 500;
+  cursor: pointer; user-select: none;
+  transition: all .18s cubic-bezier(.4,0,.2,1);
+}
+.pill-dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; opacity: .5; transition: all .18s; flex-shrink: 0; }
+.pill.on { background: rgba(34,211,238,.08); border-color: rgba(34,211,238,.28); color: var(--cyan); }
+.pill.on .pill-dot { opacity: 1; box-shadow: 0 0 6px var(--cyan); }
+.pill:hover:not(.on) { color: var(--t2); background: rgba(255,255,255,.05); border-color: var(--line-2); }
+
+/* ─────────────────────────────────────────────
+   BUTTONS
+───────────────────────────────────────────── */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: .35rem;
+  padding: .38rem .85rem; border-radius: var(--pill);
+  border: 1px solid var(--line-2); background: rgba(255,255,255,.04);
+  color: var(--t2); font-size: .76rem; font-weight: 500;
+  cursor: pointer; transition: all .15s; font-family: inherit; white-space: nowrap;
+}
+.btn:hover { color: var(--t1); background: rgba(255,255,255,.07); border-color: var(--line-3); }
+.btn:active { transform: scale(.98); }
+.btn-row { display: flex; gap: .38rem; flex-wrap: wrap; margin-top: .5rem; }
+
+.btn-cta {
+  width: 100%; padding: .82rem 1.5rem; border-radius: var(--r); border: none;
+  font-size: .92rem; font-weight: 700; letter-spacing: -.01em; color: #03080F;
+  cursor: pointer;
+  background: linear-gradient(130deg, #22D3EE 0%, #6366F1 45%, #A78BFA 100%);
+  background-size: 200% 200%; animation: cta-shift 5s ease infinite;
+  transition: opacity .2s, transform .2s, box-shadow .2s;
+  position: relative; overflow: hidden; font-family: inherit;
+}
+@keyframes cta-shift { 0%{background-position:0% 50%} 50%{background-position:100% 50%} 100%{background-position:0% 50%} }
+.btn-cta::after {
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(to right, transparent, rgba(255,255,255,.18) 50%, transparent);
+  transform: translateX(-100%); transition: transform .55s ease;
+}
+.btn-cta:hover { opacity: .93; transform: translateY(-2px); box-shadow: 0 12px 40px rgba(99,102,241,.38); }
+.btn-cta:hover::after { transform: translateX(100%); }
+.btn-cta:active { transform: translateY(0); }
+.btn-cta:disabled { opacity: .28; cursor: not-allowed; animation: none; transform: none !important; box-shadow: none !important; }
+.btn-cta:disabled::after { display: none; }
+
+.launch-progress {
+  margin-top: 1rem;
+  background: linear-gradient(180deg, rgba(12,21,37,.96), rgba(8,14,27,.96));
+  border: 1px solid rgba(96,165,250,.18);
+  border-radius: var(--r);
+  padding: 1rem 1.05rem;
+}
+.launch-progress-head {
+  display: flex; align-items: baseline; justify-content: space-between; gap: .8rem;
+  margin-bottom: .55rem;
+}
+.launch-progress-title { font-size: .86rem; font-weight: 600; letter-spacing: -.02em; color: var(--t1); }
+.launch-progress-state { font-size: .72rem; color: var(--cyan); text-transform: uppercase; letter-spacing: .08em; font-weight: 700; }
+.launch-progress-sub { color: var(--t2); font-size: .77rem; margin-bottom: .8rem; }
+.launch-track {
+  width: 100%; height: 12px; border-radius: var(--pill);
+  background: rgba(255,255,255,.06); overflow: hidden;
+  border: 1px solid rgba(255,255,255,.06);
+}
+.launch-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #22D3EE 0%, #60A5FA 52%, #818CF8 100%);
+  box-shadow: 0 0 24px rgba(96,165,250,.28);
+  transition: width .45s ease;
+}
+.launch-meta {
+  margin-top: .72rem;
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .55rem;
+}
+.launch-meta-item {
+  background: rgba(255,255,255,.03); border: 1px solid var(--line);
+  border-radius: var(--r-sm); padding: .58rem .68rem;
+}
+.launch-meta-label {
+  font-size: .64rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--t3);
+  margin-bottom: .2rem;
+}
+.launch-meta-value {
+  font-size: .78rem; color: var(--t1); font-weight: 600;
+  font-family: 'JetBrains Mono', monospace;
+  word-break: break-word;
+}
+.launch-progress-table { margin-top: .85rem; }
+
+/* ─────────────────────────────────────────────
+   FORM
+───────────────────────────────────────────── */
+.fl { display: block; font-size: .67rem; font-weight: 700; text-transform: uppercase; letter-spacing: .09em; color: var(--t3); margin-bottom: .38rem; }
+
+input[type=text], select {
+  width: 100%; padding: .46rem .72rem;
+  border: 1px solid var(--line-2); border-radius: var(--r-sm);
+  background: var(--lift); color: var(--t1);
+  font-size: .8rem; font-family: inherit; outline: none;
+  transition: border-color .15s, box-shadow .15s; -webkit-appearance: none;
+}
+input[type=text]:focus, select:focus { border-color: rgba(34,211,238,.38); box-shadow: 0 0 0 3px rgba(34,211,238,.05); }
+input[type=text]::placeholder { color: var(--t3); }
+select option { background: var(--lift); }
+
+.sld-wrap { margin-bottom: .4rem; }
+.sld-head { display: flex; justify-content: space-between; margin-bottom: .32rem; }
+.sld-lbl  { font-size: .67rem; font-weight: 700; text-transform: uppercase; letter-spacing: .09em; color: var(--t3); }
+.sld-val  { font-size: .76rem; font-weight: 600; color: var(--cyan); font-family: 'JetBrains Mono', monospace; }
+
+input[type=range] {
+  width: 100%; height: 3px; -webkit-appearance: none; appearance: none;
+  background: var(--line-2); border-radius: 2px; outline: none; cursor: pointer;
+}
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 13px; height: 13px; border-radius: 50%;
+  background: var(--cyan); cursor: pointer; box-shadow: 0 0 0 3px rgba(34,211,238,.14); transition: box-shadow .15s;
+}
+input[type=range]:hover::-webkit-slider-thumb { box-shadow: 0 0 0 5px rgba(34,211,238,.2); }
+
+details > summary {
+  cursor: pointer; list-style: none; font-size: .76rem; font-weight: 500; color: var(--t3);
+  padding: .45rem 0; user-select: none;
+  display: flex; align-items: center; gap: .35rem; transition: color .15s;
+}
+details > summary:hover { color: var(--t2); }
+details > summary::before { content: '▸'; font-size: .65rem; display: inline-block; transition: transform .2s; }
+details[open] > summary::before { transform: rotate(90deg); }
+details[open] > summary { color: var(--t2); }
+
+.adv-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: .7rem 1.1rem;
+  margin-top: .72rem; padding-top: .72rem; border-top: 1px solid var(--line);
+}
+
+/* ─────────────────────────────────────────────
+   HINT BOX
+───────────────────────────────────────────── */
+.hint {
+  font-size: .76rem; color: var(--t3); padding: .55rem .8rem; border-radius: var(--r-sm);
+  border: 1px solid var(--line); background: rgba(255,255,255,.02); line-height: 1.5;
+}
+.hint strong { color: var(--t2); }
+
+/* ─────────────────────────────────────────────
+   PRESET STRIP
+───────────────────────────────────────────── */
+.preset-strip {
+  display: flex; gap: .4rem; flex-wrap: wrap;
+  padding-bottom: 1rem; margin-bottom: .9rem; border-bottom: 1px solid var(--line);
+}
+.pbtn {
+  display: inline-flex; align-items: center; gap: .32rem;
+  padding: .35rem .8rem; border-radius: var(--pill);
+  border: 1px solid var(--line-2); background: rgba(255,255,255,.03);
+  color: var(--t2); font-size: .76rem; font-weight: 500;
+  cursor: pointer; transition: all .14s; font-family: inherit;
+}
+.pbtn:hover { color: var(--t1); background: rgba(255,255,255,.06); border-color: var(--line-3); }
+.pbtn .pi { font-size: .75rem; opacity: .6; }
+.pbtn.pdanger { color: rgba(248,113,113,.75); border-color: rgba(248,113,113,.18); }
+.pbtn.pdanger:hover { background: rgba(248,113,113,.08); border-color: rgba(248,113,113,.35); color: var(--red); }
+
+/* ─────────────────────────────────────────────
+   FEATURE TOGGLE GRID  ← new
+───────────────────────────────────────────── */
+
+/* Search bar */
+.fg-search-wrap {
+  position: relative; margin-bottom: .9rem;
+}
+.fg-search-icon {
+  position: absolute; left: .7rem; top: 50%; transform: translateY(-50%);
+  color: var(--t3); font-size: .8rem; pointer-events: none;
+}
+.fg-search {
+  width: 100%; padding: .42rem .75rem .42rem 2.1rem;
+  border: 1px solid var(--line-2); border-radius: var(--pill);
+  background: var(--lift); color: var(--t1);
+  font-size: .8rem; font-family: inherit; outline: none;
+  transition: border-color .15s, box-shadow .15s;
+}
+.fg-search:focus { border-color: rgba(34,211,238,.38); box-shadow: 0 0 0 3px rgba(34,211,238,.05); }
+.fg-search::placeholder { color: var(--t3); }
+
+/* Group section */
+.fg-group { margin-bottom: 1.05rem; }
+.fg-group.dimmed { opacity: .35; }  /* when search hides all in group */
+
+.fg-group-head {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: .5rem;
+}
+.fg-group-left { display: flex; align-items: center; gap: .45rem; }
+.fg-group-dot  { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.fg-group-name { font-size: .68rem; font-weight: 800; text-transform: uppercase; letter-spacing: .09em; }
+.fg-group-count {
+  font-size: .68rem; color: var(--t3); font-family: 'JetBrains Mono', monospace;
+  background: rgba(255,255,255,.04); padding: .08rem .38rem; border-radius: var(--pill);
+}
+.fg-group-btns { display: flex; gap: .28rem; }
+.fg-gbtn {
+  font-size: .68rem; padding: .12rem .48rem; border-radius: var(--pill);
+  border: 1px solid var(--line); background: transparent;
+  color: var(--t3); cursor: pointer; font-family: inherit; transition: all .12s;
+}
+.fg-gbtn:hover { color: var(--t1); border-color: var(--line-2); }
+
+/* Feature chips */
+.fg-chips { display: flex; flex-wrap: wrap; gap: .32rem; }
+
+.fg-chip {
+  display: inline-flex; align-items: center; gap: .26rem;
+  padding: .24rem .6rem; border-radius: var(--pill);
+  font-size: .76rem; cursor: pointer; user-select: none;
+  transition: all .16s cubic-bezier(.4,0,.2,1);
+  /* OFF state */
+  border: 1px solid var(--line); background: transparent;
+  color: var(--t3); opacity: .45;
+}
+.fg-chip:hover { opacity: .75; border-color: var(--line-2); color: var(--t2); }
+.fg-chip.on {
+  opacity: 1;
+  /* ON colors injected via inline style */
+}
+.fg-chip.on:hover { opacity: .82; }
+.fg-chip.hidden { display: none; }
+
+.fg-chip-dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; transition: opacity .15s; }
+.fg-chip:not(.on) .fg-chip-dot { display: none; }
+
+/* ─────────────────────────────────────────────
+   FEATURE CHIPS  (right preview panel)
+───────────────────────────────────────────── */
+.chip-cloud { display: flex; flex-wrap: wrap; gap: .32rem; }
+.fchip {
+  display: inline-flex; align-items: center; gap: .27rem;
+  padding: .18rem .52rem; border-radius: var(--pill);
+  font-size: .72rem; font-weight: 400; border: 1px solid transparent;
+}
+.fchip .fdot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
+.fchip.more { background: rgba(255,255,255,.03); border-color: var(--line); color: var(--t3); }
+
+/* ─────────────────────────────────────────────
+   TABLE
+───────────────────────────────────────────── */
+.tbl-wrap { overflow-x: auto; }
+.dtbl { width: 100%; border-collapse: collapse; font-size: .77rem; }
+.dtbl th { padding: .42rem .7rem; text-align: left; font-size: .63rem; font-weight: 800; text-transform: uppercase; letter-spacing: .09em; color: var(--t3); border-bottom: 1px solid var(--line-2); white-space: nowrap; }
+.dtbl td { padding: .4rem .7rem; color: var(--t2); border-bottom: 1px solid var(--line); }
+.dtbl tr:last-child td { border-bottom: none; }
+.dtbl tr:hover td { background: rgba(255,255,255,.02); }
+.v-ok   { color: var(--green)  !important; font-weight: 600; }
+.v-fail { color: var(--red)    !important; font-weight: 600; }
+.v-skip { color: var(--t3)     !important; }
+.v-num  { color: var(--cyan); font-family: 'JetBrains Mono', monospace; }
+
+/* ─────────────────────────────────────────────
+   CHART CONTAINER
+───────────────────────────────────────────── */
+.cbox { border-radius: var(--r-sm); overflow: hidden; }
+.cbox img { width: 100%; display: block; }
+
+/* ─────────────────────────────────────────────
+   TARGET ACCORDION
+───────────────────────────────────────────── */
+.tacc { border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; margin-bottom: .7rem; transition: border-color .2s; }
+.tacc:hover { border-color: var(--line-2); }
+.tacc-head { display: flex; align-items: center; justify-content: space-between; padding: .8rem 1.1rem; cursor: pointer; background: var(--surface); user-select: none; transition: background .15s; }
+.tacc-head:hover { background: var(--lift); }
+.tacc-ht { font-size: .88rem; font-weight: 600; color: var(--t1); }
+.tacc-meta { display: flex; align-items: center; gap: .6rem; }
+.tacc-badge { font-family: 'JetBrains Mono', monospace; font-size: .72rem; color: var(--cyan); background: rgba(34,211,238,.08); border: 1px solid rgba(34,211,238,.15); padding: .12rem .48rem; border-radius: var(--pill); }
+.tacc-arr { color: var(--t3); font-size: .6rem; transition: transform .2s; }
+.tacc.open .tacc-arr { transform: rotate(180deg); }
+.tacc-body { display: none; padding: 1.05rem 1.1rem; border-top: 1px solid var(--line); }
+.tacc.open .tacc-body { display: block; }
+
+/* ─────────────────────────────────────────────
+   MODEL TABS
+───────────────────────────────────────────── */
+.mtabs-nav { display: flex; gap: .3rem; flex-wrap: wrap; margin-bottom: .8rem; }
+.mtab { padding: .28rem .7rem; border-radius: var(--pill); border: 1px solid var(--line); background: transparent; color: var(--t3); font-size: .72rem; font-weight: 500; cursor: pointer; transition: all .13s; font-family: inherit; }
+.mtab.on { border-color: rgba(34,211,238,.28); color: var(--cyan); background: rgba(34,211,238,.06); }
+.mtab:hover:not(.on) { color: var(--t2); border-color: var(--line-2); }
+.mtab-panel { display: none; }
+.mtab-panel.on { display: block; }
+
+/* ─────────────────────────────────────────────
+   RUN SELECTOR
+───────────────────────────────────────────── */
+.rs-row { display: flex; gap: .55rem; margin-bottom: 1.2rem; }
+.rs-row select { flex: 1; padding: .5rem .75rem; border-radius: var(--r-sm); font-size: .82rem; }
+
+/* ─────────────────────────────────────────────
+   LOG
+───────────────────────────────────────────── */
+.log { font-family: 'JetBrains Mono','Consolas',monospace; font-size: .7rem; line-height: 1.55; color: #7FB3D5; background: rgba(0,0,0,.45); border: 1px solid var(--line); border-radius: var(--r-sm); padding: .7rem .9rem; overflow-x: auto; overflow-y: auto; max-height: 260px; white-space: pre-wrap; word-break: break-word; }
+
+/* ─────────────────────────────────────────────
+   AVAILABILITY
+───────────────────────────────────────────── */
+.avail > summary { list-style: none; cursor: pointer; color: var(--t3); font-size: .75rem; user-select: none; display: flex; align-items: center; gap: .35rem; transition: color .15s; }
+.avail > summary:hover { color: var(--t2); }
+.avail > summary::before { content: '▸'; font-size: .63rem; display: inline-block; transition: transform .2s; }
+.avail[open] > summary::before { transform: rotate(90deg); }
+
+/* ─────────────────────────────────────────────
+   LOADING
+───────────────────────────────────────────── */
+.ls { display: none; position: fixed; inset: 0; background: rgba(3,8,16,.88); backdrop-filter: blur(16px) saturate(140%); z-index: 9999; flex-direction: column; align-items: center; justify-content: center; gap: 1.2rem; }
+.ls.show { display: flex; }
+.ls-ring { position: relative; width: 48px; height: 48px; }
+.ls-ring::before,.ls-ring::after { content: ''; position: absolute; inset: 0; border-radius: 50%; }
+.ls-ring::before { border: 2px solid rgba(34,211,238,.1); }
+.ls-ring::after  { border: 2px solid transparent; border-top-color: var(--cyan); animation: lspin .75s linear infinite; }
+@keyframes lspin { to { transform: rotate(360deg); } }
+.ls-msg { font-size: .85rem; color: var(--t2); }
+
+/* ─────────────────────────────────────────────
+   TOASTS
+───────────────────────────────────────────── */
+.ts-wrap { position: fixed; bottom: 1.4rem; right: 1.4rem; z-index: 9998; display: flex; flex-direction: column; gap: .4rem; pointer-events: none; }
+.toast { pointer-events: all; display: flex; align-items: flex-start; gap: .55rem; padding: .62rem .9rem; border-radius: var(--r-sm); background: var(--lift); border: 1px solid var(--line-2); color: var(--t2); font-size: .78rem; line-height: 1.4; box-shadow: 0 8px 28px rgba(0,0,0,.55); animation: tin .18s ease; max-width: 320px; }
+.toast-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; margin-top: .32rem; }
+.toast.ok   .toast-dot { background: var(--green); box-shadow: 0 0 7px var(--green); }
+.toast.err  .toast-dot { background: var(--red);   box-shadow: 0 0 7px var(--red); }
+.toast.info .toast-dot { background: var(--blue);  box-shadow: 0 0 7px var(--blue); }
+@keyframes tin { from { transform: translateX(18px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+/* ─────────────────────────────────────────────
+   MISC
+───────────────────────────────────────────── */
+code { font-family: 'JetBrains Mono', monospace; font-size: .81em; padding: .1em .35em; background: rgba(255,255,255,.07); border-radius: 4px; color: var(--cyan); }
+.divider { height: 1px; background: var(--line); margin: 1.1rem 0; }
+.mt1 { margin-top: 1rem; }   .mt15 { margin-top: 1.5rem; }   .mt2 { margin-top: 2rem; }
+.mb05 { margin-bottom:.5rem; } .mb1 { margin-bottom:1rem; }
+.empty-state { text-align: center; padding: 3rem 1rem; color: var(--t3); }
+.empty-state .ei { font-size: 2rem; opacity: .25; margin-bottom: .6rem; }
+
+@media (max-width: 1000px) {
+  .g3,.g2w { grid-template-columns: 1fr; }
+  .g5 { grid-template-columns: repeat(3,1fr); }
+  .g2 { grid-template-columns: 1fr; }
+  .g4 { grid-template-columns: 1fr 1fr; }
+  .launch-meta { grid-template-columns: 1fr 1fr; }
+  .page { padding: 1.4rem 1rem 4rem; }
+  .topbar { padding: 0 1rem; }
+}
+</style>
+</head>
+<body>
+
+<!-- Loading -->
+<div class="ls" id="ls">
+  <div class="ls-ring"></div>
+  <div class="ls-msg" id="ls-msg">Loading…</div>
+</div>
+
+<!-- Toasts -->
+<div class="ts-wrap" id="ts"></div>
+
+<!-- Topbar -->
+<header class="topbar">
+  <a class="tb-brand" href="#">
+    <img class="tb-logomark" src="{{ url_for('static', filename='medstudio-logo.svg') }}" alt="MedStudio logo" />
+    <span class="tb-namewrap">
+      <span class="tb-name">MedStudio</span>
+      <span class="tb-tag">SBM Risk Studio</span>
+    </span>
+  </a>
+  <div class="tb-sep"></div>
+  <nav class="tb-nav">
+    <button class="tbnav-btn active" onclick="switchTab('launchpad')"><span class="ndot"></span>Launchpad</button>
+    <button class="tbnav-btn"        onclick="switchTab('results')"  ><span class="ndot"></span>Results Explorer</button>
+  </nav>
+  <div class="tb-spacer"></div>
+  <div class="tb-pills">
+    <span class="tb-pill"><span class="tp-dot"></span><span id="hdrT">—</span> targets</span>
+    <span class="tb-pill"><span id="hdrF">—</span> features</span>
+  </div>
+</header>
+
+<main class="page">
+
+<!-- ═══════════════════════════════ LAUNCHPAD ══════════════════════════════ -->
+<section class="tab-section active" id="tab-launchpad">
+
+  <div class="ph">
+    <div class="ph-title">Launchpad</div>
+    <div class="ph-sub">Configure outcomes, select learners, shape the feature set, and launch training.</div>
+  </div>
+
+  <!-- Setup 3-col -->
+  <div class="g3 mb1">
+
+    <div class="card">
+      <div class="card-label">Step 1 · Outcome Targets</div>
+      <div class="pill-group" id="targetPills"></div>
+      <div class="btn-row">
+        <button class="btn" onclick="selectAllTargets()">All</button>
+        <button class="btn" onclick="clearTargets()">None</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">Step 2 · Learners</div>
+      <div class="pill-group" id="modelPills"></div>
+      <div class="btn-row">
+        <button class="btn" onclick="selectAllModels()">All</button>
+        <button class="btn" onclick="clearModels()">None</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">Step 3 · Run Configuration</div>
+      <div class="mb1">
+        <label class="fl">Run label</label>
+        <input type="text" id="runName" placeholder="e.g. symptom-lite-temporal" />
+      </div>
+      <details>
+        <summary>Advanced training settings</summary>
+        <div class="adv-grid">
+          <div>
+            <label class="fl">Split strategy</label>
+            <select id="splitStrategy">
+              <option value="temporal">Temporal</option>
+              <option value="random">Random</option>
+              <option value="predefined">Predefined</option>
+            </select>
+          </div>
+          <div class="sld-wrap">
+            <div class="sld-head"><span class="sld-lbl">Test size</span><span class="sld-val" id="v-ts">0.20</span></div>
+            <input type="range" id="testSize"  min=".10" max=".40" step=".01" value=".20" oninput="sv('v-ts',+this.value,2)"/>
+          </div>
+          <div class="sld-wrap">
+            <div class="sld-head"><span class="sld-lbl">Threshold val</span><span class="sld-val" id="v-tv">0.20</span></div>
+            <input type="range" id="threshVal" min=".05" max=".40" step=".01" value=".20" oninput="sv('v-tv',+this.value,2)"/>
+          </div>
+          <div class="sld-wrap">
+            <div class="sld-head"><span class="sld-lbl">Min recall</span><span class="sld-val" id="v-mr">0.90</span></div>
+            <input type="range" id="minRecall" min=".50" max=".99" step=".01" value=".90" oninput="sv('v-mr',+this.value,2)"/>
+          </div>
+          <div class="sld-wrap">
+            <div class="sld-head"><span class="sld-lbl">F-beta</span><span class="sld-val" id="v-fb">2.0</span></div>
+            <input type="range" id="fBeta"     min=".5"  max="5.0" step=".1"  value="2.0" oninput="sv('v-fb',+this.value,1)"/>
+          </div>
+          <div class="sld-wrap">
+            <div class="sld-head"><span class="sld-lbl">FN cost</span><span class="sld-val" id="v-fn">5.0</span></div>
+            <input type="range" id="fnCost"    min=".5"  max="10.0" step=".5" value="5.0" oninput="sv('v-fn',+this.value,1)"/>
+          </div>
+          <div class="sld-wrap">
+            <div class="sld-head"><span class="sld-lbl">FP cost</span><span class="sld-val" id="v-fp">1.0</span></div>
+            <input type="range" id="fpCost"    min=".5"  max="10.0" step=".5" value="1.0" oninput="sv('v-fp',+this.value,1)"/>
+          </div>
+          <div>
+            <label class="fl">Split column</label>
+            <input type="text" id="splitColumn" value="Split" />
+          </div>
+          <div>
+            <label class="fl">Date column</label>
+            <input type="text" id="dateColumn" value="Date of surgery" />
+          </div>
+        </div>
+      </details>
+    </div>
+  </div>
+
+  <!-- Snapshot 5-col -->
+  <div class="g5 mb1" style="margin-bottom:1.4rem">
+    <div class="sc"><div class="sc-glow" style="background:var(--blue)"></div>
+      <div class="sc-label">Targets</div><div class="sc-value" id="sn-t">0</div><div class="sc-cap">Selected outcomes</div>
+    </div>
+    <div class="sc"><div class="sc-glow" style="background:var(--violet)"></div>
+      <div class="sc-label">Models</div><div class="sc-value" id="sn-m">0</div><div class="sc-cap">Requested learners</div>
+    </div>
+    <div class="sc"><div class="sc-glow" style="background:var(--cyan)"></div>
+      <div class="sc-label">Features</div><div class="sc-value" id="sn-f">0</div><div class="sc-cap">Current subset</div>
+    </div>
+    <div class="sc"><div class="sc-glow" style="background:var(--green)"></div>
+      <div class="sc-label">Reduction</div><div class="sc-value" id="sn-r">0%</div><div class="sc-cap">Vs. full pool</div>
+    </div>
+    <div class="sc"><div class="sc-glow" style="background:var(--amber)"></div>
+      <div class="sc-label">Groups</div><div class="sc-value" id="sn-g">0</div><div class="sc-cap">Clinical areas</div>
+    </div>
+  </div>
+
+  <!-- Availability collapsible -->
+  <details class="avail card" style="margin-bottom:1.4rem;padding:.72rem 1rem">
+    <summary>Target-by-target model availability</summary>
+    <div class="mt1" id="availTbl"></div>
+  </details>
+
+  <!-- ── Feature Builder ── -->
+  <div class="sh">
+    <div class="sh-row">
+      <span class="sh-title">Feature Builder</span>
+      <span class="sh-sub">Click features to include or exclude them from training</span>
+    </div>
+  </div>
+
+  <!-- Preset strip -->
+  <div class="preset-strip">
+    <button class="pbtn" onclick="applyPreset('all')"     ><span class="pi">◈</span>Full Preoperative</button>
+    <button class="pbtn" onclick="applyPreset('clinical')" ><span class="pi">♥</span>Clinical Core</button>
+    <button class="pbtn" onclick="applyPreset('imaging')"  ><span class="pi">◉</span>Imaging Focus</button>
+    <button class="pbtn" onclick="applyPreset('compact')"  ><span class="pi">◎</span>Compact Seed</button>
+    <button class="pbtn pdanger" onclick="applyPreset('clear')"><span class="pi">×</span>Clear All</button>
+  </div>
+
+  <!-- Builder 2-col -->
+  <div class="g2w">
+
+    <!-- LEFT: feature toggle grid -->
+    <div>
+      <!-- Search -->
+      <div class="fg-search-wrap">
+        <span class="fg-search-icon">⌕</span>
+        <input class="fg-search" id="fgSearch" placeholder="Filter features…" oninput="fgFilter(this.value)" autocomplete="off" />
+      </div>
+
+      <!-- Group grid -->
+      <div id="featureGrid"></div>
+    </div>
+
+    <!-- RIGHT: summary -->
+    <div style="position:sticky;top:68px;align-self:start">
+      <div class="hint mb1">
+        <strong>Selected subset</strong><br>
+        Chips are colour-coded by group. Use this to judge burden, balance, and what to prune next.
+      </div>
+
+      <div id="selCloud" class="chip-cloud mb1"></div>
+      <div id="gcTable" class="mb1"></div>
+      <div class="cbox" id="gcChart"></div>
+    </div>
+  </div>
+
+  <!-- Launch -->
+  <div class="mt2">
+    <div class="sh mb1">
+      <div class="sh-row">
+        <span class="sh-title">Launch Training</span>
+        <span class="sh-sub">Results written to <code>outputs/studio_runs/</code></span>
+      </div>
+    </div>
+    <button class="btn-cta" id="launchBtn" onclick="launchTraining()">
+      Train Selected Configuration
+    </button>
+    <div id="launchProgress"></div>
+  </div>
+
+  <div id="launchOut" class="mt2"></div>
+
+</section>
+
+
+<!-- ═══════════════════════════ RESULTS EXPLORER ════════════════════════════ -->
+<section class="tab-section" id="tab-results">
+
+  <div class="ph">
+    <div class="ph-title">Results Explorer</div>
+    <div class="ph-sub">Browse all experiment outputs with metrics, charts, and feature importance.</div>
+  </div>
+
+  <div class="rs-row">
+    <select id="runSel" onchange="loadRun()">
+      <option value="">— Select an experiment run —</option>
+    </select>
+    <button class="btn" onclick="refreshRuns()">Refresh</button>
+  </div>
+
+  <div id="explorerOut"></div>
+
+</section>
+
+</main>
+
+<script>
+/* ──────────────────────────────────────────────────────────
+   STATE
+────────────────────────────────────────────────────────── */
+const S = {
+  allFeatures: [], allTargets: [], allModels: [],
+  groups: [], groupMap: {},
+  selTargets: [], selModels: [], selFeatures: [],
+  runs: [],
+  activeLaunchJob: null,
+  launchPollTimer: null,
+};
+
+/* ──────────────────────────────────────────────────────────
+   GROUP  COLORS
+────────────────────────────────────────────────────────── */
+const GC = {
+  'Demographics & Timing': { bg:'rgba(251,191,36,.12)', bo:'rgba(251,191,36,.28)', tx:'#FCD34D', dot:'#FBBF24' },
+  'Comorbidities':          { bg:'rgba(248,113,113,.11)', bo:'rgba(248,113,113,.26)', tx:'#FCA5A5', dot:'#F87171' },
+  'Presentation':           { bg:'rgba(167,139,250,.12)', bo:'rgba(167,139,250,.28)', tx:'#C4B5FD', dot:'#A78BFA' },
+  'Functional Status':      { bg:'rgba(52,211,153,.10)',  bo:'rgba(52,211,153,.26)',  tx:'#6EE7B7', dot:'#34D399' },
+  'Clinical Core':          { bg:'rgba(96,165,250,.11)',  bo:'rgba(96,165,250,.26)',  tx:'#93C5FD', dot:'#60A5FA' },
+  'Imaging & Anatomy':      { bg:'rgba(34,211,238,.11)',  bo:'rgba(34,211,238,.27)',  tx:'#67E8F9', dot:'#22D3EE' },
+};
+const GCD = { bg:'rgba(255,255,255,.05)', bo:'rgba(255,255,255,.12)', tx:'#94A3B8', dot:'#94A3B8' };
+const gc  = g => GC[g] || GCD;
+
+function fGroup(f) {
+  if (f.startsWith('Comorbidities_')) return 'Comorbidities';
+  if (f.startsWith('Symptoms_'))      return 'Presentation';
+  if (f.startsWith('Radio_') || f.startsWith('Optic') || f.startsWith('ICA/')) return 'Imaging & Anatomy';
+  if (f.includes('KPS') || ['ASA','Charlson Comorbidity Index'].includes(f)) return 'Functional Status';
+  if (['Age','Sex','Date of surgery','Date of Birth'].includes(f)) return 'Demographics & Timing';
+  return 'Clinical Core';
+}
+
+/* ──────────────────────────────────────────────────────────
+   BOOT
+────────────────────────────────────────────────────────── */
+async function boot() {
+  try {
+    const cfg = await api('/api/config');
+    S.allFeatures = cfg.all_features;
+    S.allTargets  = cfg.targets;
+    S.allModels   = cfg.all_models;
+    S.groups      = cfg.groups;
+    S.groupMap    = cfg.group_map;
+    S.selTargets  = [...S.allTargets];
+    S.selModels   = [...S.allModels];
+    S.selFeatures = [...S.allFeatures];
+
+    document.getElementById('hdrT').textContent = S.allTargets.length;
+    document.getElementById('hdrF').textContent = S.allFeatures.length;
+
+    renderTargetPills();
+    renderModelPills();
+    buildFeatureGrid();
+    renderSelCloud();
+    updateSnapshot();
+    scheduleDistChart();
+    refreshAvailability();
+    refreshRuns();
+  } catch(e) { toast('Config load failed: ' + e.message, 'err'); }
+}
+
+/* ──────────────────────────────────────────────────────────
+   API
+────────────────────────────────────────────────────────── */
+async function api(url, opts = {}) {
+  let r;
+  try {
+    r = await fetch(url, opts);
+  } catch (err) {
+    throw new Error('Could not reach the Flask server. Check that it is still running and did not restart during training.');
+  }
+
+  if (!r.ok) {
+    const text = await r.text();
+    try {
+      const parsed = JSON.parse(text);
+      throw new Error(parsed.error || text);
+    } catch (_) {
+      throw new Error(text);
+    }
+  }
+  return r.json();
+}
+
+/* ──────────────────────────────────────────────────────────
+   TAB
+────────────────────────────────────────────────────────── */
+function switchTab(name) {
+  document.querySelectorAll('.tab-section').forEach(s => s.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  document.querySelectorAll('.tbnav-btn').forEach((b, i) => {
+    b.classList.toggle('active', (name === 'launchpad' && i === 0) || (name === 'results' && i === 1));
+  });
+}
+
+/* ──────────────────────────────────────────────────────────
+   SLIDER HELPER
+────────────────────────────────────────────────────────── */
+function sv(id, val, dec) { document.getElementById(id).textContent = Number(val).toFixed(dec); }
+
+/* ──────────────────────────────────────────────────────────
+   TARGET / MODEL PILLS
+────────────────────────────────────────────────────────── */
+function renderTargetPills() {
+  document.getElementById('targetPills').innerHTML = S.allTargets.map(t =>
+    `<span class="pill ${S.selTargets.includes(t)?'on':''}" onclick="toggleTarget('${esc(t)}')">`+
+    `<span class="pill-dot"></span>${esc(t)}</span>`).join('');
+}
+function renderModelPills() {
+  document.getElementById('modelPills').innerHTML = S.allModels.map(m =>
+    `<span class="pill ${S.selModels.includes(m)?'on':''}" onclick="toggleModel('${esc(m)}')">`+
+    `<span class="pill-dot"></span>${esc(m)}</span>`).join('');
+}
+function toggleTarget(t) { toggle(S.selTargets, t); renderTargetPills(); updateSnapshot(); refreshAvailability(); }
+function toggleModel(m)  { toggle(S.selModels,  m); renderModelPills();  updateSnapshot(); }
+function toggle(arr, v)  { const i=arr.indexOf(v); if(i>=0) arr.splice(i,1); else arr.push(v); }
+function selectAllTargets() { S.selTargets=[...S.allTargets]; renderTargetPills(); updateSnapshot(); refreshAvailability(); }
+function clearTargets()     { S.selTargets=[];                renderTargetPills(); updateSnapshot(); refreshAvailability(); }
+function selectAllModels()  { S.selModels=[...S.allModels];   renderModelPills();  updateSnapshot(); }
+function clearModels()      { S.selModels=[];                 renderModelPills();  updateSnapshot(); }
+
+/* ──────────────────────────────────────────────────────────
+   SNAPSHOT
+────────────────────────────────────────────────────────── */
+function updateSnapshot() {
+  const n=S.selFeatures.length, tot=S.allFeatures.length;
+  setText('sn-t', S.selTargets.length);
+  setText('sn-m', S.selModels.length);
+  setText('sn-f', n);
+  setText('sn-r', tot>0 ? Math.round(100*(1-n/tot))+'%' : '0%');
+  setText('sn-g', new Set(S.selFeatures.map(fGroup)).size);
+  const launchBusy = !!S.activeLaunchJob && !['completed','failed'].includes(S.activeLaunchJob.status);
+  document.getElementById('launchBtn').disabled =
+    !S.selTargets.length || !S.selModels.length || !n || launchBusy;
+}
+function setText(id, v) { document.getElementById(id).textContent = v; }
+
+/* ──────────────────────────────────────────────────────────
+   AVAILABILITY
+────────────────────────────────────────────────────────── */
+async function refreshAvailability() {
+  const d = await api('/api/models-for-targets', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({targets: S.selTargets})
+  });
+  const prev = new Set(S.selModels);
+  S.allModels = d.models;
+  S.selModels = d.models.filter(m => prev.has(m));
+  if (!S.selModels.length) S.selModels = [...d.models];
+  renderModelPills(); updateSnapshot();
+  const el = document.getElementById('availTbl');
+  el.innerHTML = d.availability.length
+    ? tbl(['target','available_models','n_models'], d.availability)
+    : '<p style="color:var(--t3);font-size:.78rem">No targets selected.</p>';
+}
+
+/* ──────────────────────────────────────────────────────────
+   PRESET + GROUP ACTIONS  (via API)
+────────────────────────────────────────────────────────── */
+async function applyPreset(p) {
+  const d = await api('/api/features/preset', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({preset:p, all_features:S.allFeatures})
+  });
+  setFeatures(d.features);
+}
+
+async function groupActionAll(group)  { await applyGroupOp('add',    group); }
+async function groupActionNone(group) { await applyGroupOp('remove', group); }
+
+async function applyGroupOp(action, group) {
+  const d = await api('/api/features/group-action', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({action, group, all_features:S.allFeatures, selected:S.selFeatures})
+  });
+  setFeatures(d.features);
+}
+
+function setFeatures(list) {
+  S.selFeatures = list;
+  refreshGrid();
+  renderSelCloud();
+  updateSnapshot();
+  scheduleDistChart();
+}
+
+/* ──────────────────────────────────────────────────────────
+   FEATURE TOGGLE GRID  ← new core interaction
+────────────────────────────────────────────────────────── */
+function buildFeatureGrid() {
+  const container = document.getElementById('featureGrid');
+  container.innerHTML = '';
+  const sel = new Set(S.selFeatures);
+
+  S.groups.forEach(group => {
+    const c     = gc(group);
+    const feats = S.groupMap[group] || [];
+
+    const section = document.createElement('div');
+    section.className  = 'fg-group';
+    section.dataset.group = group;
+
+    // Header
+    const head = document.createElement('div');
+    head.className = 'fg-group-head';
+    head.innerHTML = `
+      <div class="fg-group-left">
+        <span class="fg-group-dot"  style="background:${c.dot}"></span>
+        <span class="fg-group-name" style="color:${c.tx}">${group}</span>
+        <span class="fg-group-count" id="gc-${safeid(group)}">${feats.filter(f=>sel.has(f)).length}/${feats.length}</span>
+      </div>
+      <div class="fg-group-btns">
+        <button class="fg-gbtn" onclick="groupActionAll('${group.replace(/'/g,"\\'")}')">All</button>
+        <button class="fg-gbtn" onclick="groupActionNone('${group.replace(/'/g,"\\'")}')">None</button>
+      </div>`;
+    section.appendChild(head);
+
+    // Chips
+    const cloud = document.createElement('div');
+    cloud.className = 'fg-chips';
+    feats.forEach(feat => {
+      const on  = sel.has(feat);
+      const chip = document.createElement('span');
+      chip.className   = 'fg-chip' + (on ? ' on' : '');
+      chip.dataset.feat = feat;
+      chip.dataset.group = group;
+      chip.title        = feat;
+      if (on) {
+        chip.style.cssText = `background:${c.bg};border-color:${c.bo};color:${c.tx}`;
+      }
+      chip.innerHTML =
+        `<span class="fg-chip-dot" style="background:${c.dot}"></span>${esc(feat)}`;
+      chip.addEventListener('click', () => toggleFeature(feat));
+      cloud.appendChild(chip);
+    });
+    section.appendChild(cloud);
+    container.appendChild(section);
+  });
+}
+
+/* Sync chip DOM from S.selFeatures without full rebuild */
+function refreshGrid() {
+  const sel = new Set(S.selFeatures);
+  document.querySelectorAll('.fg-chip').forEach(chip => {
+    const feat  = chip.dataset.feat;
+    const group = chip.dataset.group;
+    const on    = sel.has(feat);
+    const c     = gc(group);
+    chip.classList.toggle('on', on);
+    chip.style.cssText = on ? `background:${c.bg};border-color:${c.bo};color:${c.tx}` : '';
+  });
+  // Update per-group counts
+  S.groups.forEach(group => {
+    const feats  = S.groupMap[group] || [];
+    const cnt    = feats.filter(f => sel.has(f)).length;
+    const el     = document.getElementById('gc-' + safeid(group));
+    if (el) el.textContent = `${cnt}/${feats.length}`;
+    // Dim the whole section if all off
+    const sec = document.querySelector(`.fg-group[data-group="${group}"]`);
+    if (sec) sec.classList.toggle('dimmed', cnt === 0);
+  });
+}
+
+function toggleFeature(feat) {
+  const idx = S.selFeatures.indexOf(feat);
+  if (idx >= 0) S.selFeatures.splice(idx, 1);
+  else          S.selFeatures.push(feat);
+  refreshGrid();
+  renderSelCloud();
+  updateSnapshot();
+  scheduleDistChart();
+}
+
+/* Filter chips by search */
+function fgFilter(q) {
+  const ql = q.toLowerCase().trim();
+  S.groups.forEach(group => {
+    const sec   = document.querySelector(`.fg-group[data-group="${group}"]`);
+    if (!sec) return;
+    let anyVis  = false;
+    sec.querySelectorAll('.fg-chip').forEach(chip => {
+      const match = !ql || chip.dataset.feat.toLowerCase().includes(ql);
+      chip.classList.toggle('hidden', !match);
+      if (match) anyVis = true;
+    });
+    sec.style.display = anyVis ? '' : 'none';
+  });
+}
+
+/* ──────────────────────────────────────────────────────────
+   RIGHT PANEL: chip cloud + group table + chart
+────────────────────────────────────────────────────────── */
+function renderSelCloud() {
+  const el = document.getElementById('selCloud');
+  if (!S.selFeatures.length) {
+    el.innerHTML = '<span style="color:var(--t3);font-size:.76rem">No features selected.</span>';
+    renderGcTable(); return;
+  }
+  const LIMIT = 28, vis = S.selFeatures.slice(0, LIMIT), more = S.selFeatures.length - LIMIT;
+  el.innerHTML = vis.map(f => {
+    const c = gc(fGroup(f));
+    return `<span class="fchip" style="background:${c.bg};border-color:${c.bo};color:${c.tx}">
+              <span class="fdot" style="background:${c.dot}"></span>${esc(f)}</span>`;
+  }).join('') + (more > 0 ? `<span class="fchip more">+${more} more</span>` : '');
+  renderGcTable();
+}
+
+function renderGcTable() {
+  const counts = {};
+  S.selFeatures.forEach(f => { const g=fGroup(f); counts[g]=(counts[g]||0)+1; });
+  const rows = Object.entries(counts).sort((a,b)=>b[1]-a[1]).map(([g,n])=>({Group:g,Selected:n}));
+  document.getElementById('gcTable').innerHTML = rows.length ? tbl(['Group','Selected'], rows) : '';
+}
+
+let chartTimer;
+function scheduleDistChart() {
+  clearTimeout(chartTimer);
+  chartTimer = setTimeout(async () => {
+    if (!S.selFeatures.length) { document.getElementById('gcChart').innerHTML=''; return; }
+    const d = await api('/api/chart/group-distribution', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({features: S.selFeatures})
+    });
+    document.getElementById('gcChart').innerHTML =
+      d.image ? `<img src="${d.image}" alt="Group distribution"/>` : '';
+  }, 600);
+}
+
+/* ──────────────────────────────────────────────────────────
+   LAUNCH
+────────────────────────────────────────────────────────── */
+async function launchTraining() {
+  if (!S.selTargets.length)  { toast('Select at least one target.',  'err'); return; }
+  if (!S.selModels.length)   { toast('Select at least one model.',   'err'); return; }
+  if (!S.selFeatures.length) { toast('Select at least one feature.', 'err'); return; }
+  if (S.activeLaunchJob && !['completed','failed'].includes(S.activeLaunchJob.status)) {
+    toast('A training job is already running.', 'err'); return;
+  }
+
+  showLoader('Starting training job…');
+  try {
+    const res = await api('/api/launch', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        targets: S.selTargets, models: S.selModels,
+        selected_features: S.selFeatures,
+        run_name:           document.getElementById('runName').value,
+        split_strategy:     document.getElementById('splitStrategy').value,
+        test_size:          +document.getElementById('testSize').value,
+        threshold_val_size: +document.getElementById('threshVal').value,
+        min_recall:         +document.getElementById('minRecall').value,
+        f_beta:             +document.getElementById('fBeta').value,
+        fn_cost:            +document.getElementById('fnCost').value,
+        fp_cost:            +document.getElementById('fpCost').value,
+        split_column:       document.getElementById('splitColumn').value,
+        date_column:        document.getElementById('dateColumn').value,
+      })
+    });
+    hideLoader();
+    S.activeLaunchJob = res;
+    updateSnapshot();
+    renderLaunchProgress(res);
+    document.getElementById('launchOut').innerHTML = '';
+    toast('Training started. Progress will update automatically.', 'ok');
+    startLaunchPolling(res.job_id);
+  } catch(e) { hideLoader(); toast('Launch failed: '+e.message,'err'); }
+}
+
+function startLaunchPolling(jobId) {
+  stopLaunchPolling();
+  pollLaunchJob(jobId);
+}
+
+function stopLaunchPolling() {
+  if (S.launchPollTimer) {
+    clearTimeout(S.launchPollTimer);
+    S.launchPollTimer = null;
+  }
+}
+
+async function pollLaunchJob(jobId) {
+  try {
+    const job = await api('/api/launch/status?job_id=' + encodeURIComponent(jobId));
+    S.activeLaunchJob = job;
+    updateSnapshot();
+    renderLaunchProgress(job);
+
+    if (job.status === 'completed' || job.status === 'failed') {
+      stopLaunchPolling();
+      if (job.status === 'completed') {
+        const ok = job.execution.filter(r=>r.status==='ok').length;
+        const fl = job.execution.filter(r=>r.status==='failed').length;
+        toast(fl ? `Training done — ${fl} failed.` : `Training done — ${ok} succeeded.`, fl?'err':'ok');
+        renderLaunchOut(job);
+        refreshRuns();
+      } else {
+        toast('Training failed: ' + (job.error || 'unknown error'), 'err');
+        if (job.execution?.length) renderLaunchOut(job);
+      }
+      return;
+    }
+  } catch (e) {
+    stopLaunchPolling();
+    toast('Progress polling failed: ' + e.message, 'err');
+    return;
+  }
+
+  S.launchPollTimer = setTimeout(() => pollLaunchJob(jobId), 1000);
+}
+
+function renderLaunchProgress(job) {
+  const el = document.getElementById('launchProgress');
+  if (!job) { el.innerHTML = ''; return; }
+
+  const pct = Math.max(0, Math.min(100, Number(job.progress_pct || 0)));
+  const state = String(job.status || 'queued').toUpperCase();
+  const summary = job.current_step || 'Waiting for updates...';
+  const targetLabel = job.current_target || '—';
+  const modelLabel = job.current_model || '—';
+  const unitLabel = `${job.completed_units || 0}/${job.total_units || 0}`;
+  const targetCount = `${job.completed_targets || 0}/${job.total_targets || 0}`;
+  const tableHtml = job.execution?.length
+    ? `<div class="launch-progress-table tbl-wrap">${tbl(['target','status','models','message'], job.execution)}</div>`
+    : '';
+
+  el.innerHTML = `
+    <div class="launch-progress">
+      <div class="launch-progress-head">
+        <div class="launch-progress-title">Training Progress</div>
+        <div class="launch-progress-state">${esc(state)}</div>
+      </div>
+      <div class="launch-progress-sub">${esc(summary)}</div>
+      <div class="launch-track"><div class="launch-fill" style="width:${pct}%"></div></div>
+      <div class="launch-meta">
+        <div class="launch-meta-item">
+          <div class="launch-meta-label">Progress</div>
+          <div class="launch-meta-value">${pct.toFixed(0)}%</div>
+        </div>
+        <div class="launch-meta-item">
+          <div class="launch-meta-label">Targets</div>
+          <div class="launch-meta-value">${esc(targetCount)}</div>
+        </div>
+        <div class="launch-meta-item">
+          <div class="launch-meta-label">Models</div>
+          <div class="launch-meta-value">${esc(unitLabel)}</div>
+        </div>
+        <div class="launch-meta-item">
+          <div class="launch-meta-label">Run Path</div>
+          <div class="launch-meta-value">${esc(job.run_path || '—')}</div>
+        </div>
+      </div>
+      <div class="launch-meta" style="margin-top:.55rem">
+        <div class="launch-meta-item">
+          <div class="launch-meta-label">Current Target</div>
+          <div class="launch-meta-value">${esc(targetLabel)}</div>
+        </div>
+        <div class="launch-meta-item">
+          <div class="launch-meta-label">Current Model</div>
+          <div class="launch-meta-value">${esc(modelLabel)}</div>
+        </div>
+        <div class="launch-meta-item">
+          <div class="launch-meta-label">Python</div>
+          <div class="launch-meta-value">${esc(job.python_executable || '—')}</div>
+        </div>
+        <div class="launch-meta-item">
+          <div class="launch-meta-label">Job Id</div>
+          <div class="launch-meta-value">${esc(job.job_id || '—')}</div>
+        </div>
+      </div>
+      ${tableHtml}
+    </div>`;
+}
+
+function renderLaunchOut(res) {
+  let h = `<div class="sh"><div class="sh-row"><span class="sh-title">Latest Run</span></div>
+             <div class="sh-sub" style="font-family:'JetBrains Mono',monospace;font-size:.7rem">${esc(res.run_path)}</div>
+           </div>
+           <div class="tbl-wrap card mb1">${tbl(['target','status','models','returncode','message'],res.execution)}</div>`;
+  const wl = res.execution.filter(r=>r.log);
+  if (wl.length) {
+    h += `<details style="margin-bottom:1rem"><summary>Console logs</summary>`;
+    wl.forEach(r => { h += `<div class="mt1"><strong style="color:var(--t1);font-size:.8rem">${esc(r.target)}</strong><div class="log mt1">${esc(r.log)}</div></div>`; });
+    h += '</details>';
+  }
+  if (res.run_results) h += renderResults(res.run_results);
+  document.getElementById('launchOut').innerHTML = h;
+}
+
+/* ──────────────────────────────────────────────────────────
+   RESULTS EXPLORER
+────────────────────────────────────────────────────────── */
+async function refreshRuns() {
+  const d = await api('/api/runs');
+  S.runs = d.runs;
+  const sel=document.getElementById('runSel'), prev=sel.value;
+  sel.innerHTML = '<option value="">— Select an experiment run —</option>' +
+    S.runs.map(r=>`<option value="${esc(r.path)}">${esc(r.label)}</option>`).join('');
+  if (prev && S.runs.some(r=>r.path===prev)) sel.value = prev;
+}
+
+async function loadRun() {
+  const path = document.getElementById('runSel').value;
+  if (!path) { document.getElementById('explorerOut').innerHTML=''; return; }
+  showLoader('Loading run results…');
+  try {
+    const d = await api('/api/run/results?path='+encodeURIComponent(path));
+    hideLoader();
+    document.getElementById('explorerOut').innerHTML = renderResults(d);
+  } catch(e) { hideLoader(); toast('Load failed: '+e.message,'err'); }
+}
+
+/* ──────────────────────────────────────────────────────────
+   RENDER RESULTS
+────────────────────────────────────────────────────────── */
+function renderResults(data) {
+  if (!data.targets?.length)
+    return `<div class="empty-state"><div class="ei">📭</div><p>No finished target outputs found in this run.</p></div>`;
+
+  return data.targets.map((t,ti) => `
+  <div class="tacc ${ti===0?'open':''}" id="tacc-${ti}">
+    <div class="tacc-head" onclick="toggleAcc(${ti})">
+      <div class="tacc-ht">${esc(t.target)}</div>
+      <div class="tacc-meta">
+        ${t.cards.best_metric_value
+          ? `<span class="tacc-badge">${esc(t.cards.best_metric_name)}: ${esc(t.cards.best_metric_value)}</span>` : ''}
+        <span class="tacc-arr">▼</span>
+      </div>
+    </div>
+    <div class="tacc-body">
+      <div class="g4 mb1">
+        <div class="sc"><div class="sc-label">Split</div><div class="sc-value" style="font-size:1rem">${esc(t.cards.split_strategy)}</div></div>
+        <div class="sc"><div class="sc-label">Features</div><div class="sc-value" style="font-size:1rem">${t.cards.feature_count}</div><div class="sc-cap">Model inputs</div></div>
+        <div class="sc"><div class="sc-label">Models OK</div><div class="sc-value" style="font-size:1rem">${t.cards.model_count}</div></div>
+        ${t.cards.best_metric_value
+          ? `<div class="sc"><div class="sc-glow" style="background:var(--cyan)"></div>
+               <div class="sc-label">Best ${esc(t.cards.best_metric_name)}</div>
+               <div class="sc-value" style="font-size:1rem;color:var(--cyan)">${esc(t.cards.best_metric_value)}</div>
+               <div class="sc-cap">${esc(t.cards.best_model)}</div></div>`
+          : `<div class="sc"><div class="sc-label">Best metric</div><div class="sc-value" style="font-size:1rem">n/a</div></div>`}
+      </div>
+
+      <div class="sh"><div class="sh-row"><span class="sh-title">Model Comparison</span></div></div>
+      <div class="g2 mb1">
+        <div>${t.bar_img     ? `<div class="cbox"><img src="${t.bar_img}"     alt="bar"/></div>`     : nodata()}</div>
+        <div>${t.heatmap_img ? `<div class="cbox"><img src="${t.heatmap_img}" alt="heatmap"/></div>` : nodata()}</div>
+      </div>
+      ${t.summary_table.length ? `<div class="tbl-wrap card mb1">${tbl(t.summary_columns,t.summary_table)}</div>` : ''}
+
+      <div class="sh"><div class="sh-row"><span class="sh-title">Feature Pruning View</span></div></div>
+      <div class="g2 mb1">
+        <div>${t.importance_img ? `<div class="cbox"><img src="${t.importance_img}" alt="importance"/></div>` : nodata()}</div>
+        <div>
+          ${t.weakest.length
+            ? `<div class="hint mb1"><strong>Weakest features</strong><br>Candidates for the next pruning round.</div>
+               <div class="tbl-wrap">${tbl(Object.keys(t.weakest[0]),t.weakest)}</div>`
+            : nodata()}
+        </div>
+      </div>
+
+      ${t.combined_curves.length ? `
+      <div class="sh"><div class="sh-row"><span class="sh-title">Combined Curves</span></div></div>
+      <div class="g2 mb1">${t.combined_curves.map(c=>
+        `<div class="cbox"><img src="/api/image?path=${encodeURIComponent(c.path)}" alt="${esc(c.title)}"/>
+         <div style="font-size:.7rem;color:var(--t3);margin-top:.3rem">${esc(c.title)}</div></div>`).join('')}</div>` : ''}
+
+      <div class="sh"><div class="sh-row"><span class="sh-title">Per-Model Details</span></div></div>
+      <div class="mtabs-nav">${t.models.map((m,mi)=>
+        `<button class="mtab ${mi===0?'on':''}" onclick="switchMtab(${ti},${mi})">${esc(m.name.toUpperCase())}</button>`).join('')}</div>
+      ${t.models.map((m,mi)=>`
+      <div class="mtab-panel ${mi===0?'on':''}" id="mt-${ti}-${mi}">
+        <div class="g4 mb1">
+          ${Object.entries(m.metrics).slice(0,4).map(([k,v])=>
+            `<div class="sc"><div class="sc-label">${esc(k)}</div><div class="sc-value" style="font-size:.95rem">${esc(v)}</div></div>`).join('')}
+        </div>
+        ${m.plots.length ? `<div class="g2 mb1">${m.plots.map(p=>
+          `<div class="cbox"><img src="/api/image?path=${encodeURIComponent(p.path)}" alt="${esc(p.title)}"/>
+           <div style="font-size:.7rem;color:var(--t3);margin-top:.28rem">${esc(p.title)}</div></div>`).join('')}</div>` : ''}
+        ${m.fi_table.length ? `<div class="tbl-wrap card mb1">${tbl(Object.keys(m.fi_table[0]),m.fi_table)}</div>` : ''}
+        <details style="margin-top:.75rem"><summary>Raw metrics payload</summary>
+          <pre class="log mt1">${esc(JSON.stringify(m.raw_metrics,null,2))}</pre>
+        </details>
+      </div>`).join('')}
+    </div>
+  </div>`).join('');
+}
+
+function nodata() { return '<div class="hint" style="color:var(--t3)">Not available.</div>'; }
+function toggleAcc(i) { document.getElementById('tacc-'+i)?.classList.toggle('open'); }
+function switchMtab(ti,mi) {
+  const pfx=`mt-${ti}-`;
+  document.querySelectorAll(`[id^="${pfx}"]`).forEach(p=>p.classList.remove('on'));
+  document.getElementById(`${pfx}${mi}`)?.classList.add('on');
+  document.getElementById(`tacc-${ti}`)?.querySelectorAll('.mtab').forEach((b,i)=>b.classList.toggle('on',i===mi));
+}
+
+/* ──────────────────────────────────────────────────────────
+   TABLE RENDERER
+────────────────────────────────────────────────────────── */
+function tbl(cols, rows) {
+  if (!rows.length) return '<p style="color:var(--t3);padding:.5rem;font-size:.78rem">No data.</p>';
+  const cs = cols.length ? cols : Object.keys(rows[0]);
+  let h = '<table class="dtbl"><thead><tr>' + cs.map(c=>`<th>${esc(c)}</th>`).join('') + '</tr></thead><tbody>';
+  rows.forEach(row => {
+    h += '<tr>' + cs.map(c => {
+      const v=row[c], vs=v===null||v===undefined?'—':String(v);
+      const cl = v==='ok'?'v-ok': v==='failed'?'v-fail': v==='skipped'?'v-skip':
+        (typeof v==='number'||(typeof v==='string'&&/^\d+\.?\d*$/.test(vs.trim())))?'v-num':'';
+      return `<td class="${cl}">${esc(vs)}</td>`;
+    }).join('') + '</tr>';
+  });
+  return h + '</tbody></table>';
+}
+
+/* ──────────────────────────────────────────────────────────
+   LOADING + TOASTS
+────────────────────────────────────────────────────────── */
+function showLoader(msg='Please wait…') { document.getElementById('ls-msg').textContent=msg; document.getElementById('ls').classList.add('show'); }
+function hideLoader() { document.getElementById('ls').classList.remove('show'); }
+function toast(msg, type='info') {
+  const el=document.createElement('div');
+  el.className='toast '+type;
+  el.innerHTML=`<span class="toast-dot"></span><span>${esc(msg)}</span>`;
+  document.getElementById('ts').appendChild(el);
+  setTimeout(()=>el.remove(), 4200);
+}
+
+/* ──────────────────────────────────────────────────────────
+   UTILS
+────────────────────────────────────────────────────────── */
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
+function safeid(s){return s.replace(/[\s&\/]/g,'-');}
+
+boot();
+</script>
+</body>
+</html>

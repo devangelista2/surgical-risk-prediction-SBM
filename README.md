@@ -50,6 +50,28 @@ cd experiments
 ./train.sh
 ```
 
+### Train All Targets With Grid-Search Best Parameters
+
+Run the temporal grid search first. This writes one `best_parameters.json` file per target under `gridsearch/preoperative/`.
+
+```bash
+bash experiments/grid_search.sh
+```
+
+Then train every available model for every configured target using those saved best parameters:
+
+```bash
+bash experiments/train_from_gridsearch.sh
+```
+
+This script now enables `--feature_importance` by default, so each trained model also writes:
+
+- `feature_importance.csv`
+- `feature_importance.png`
+- `feature_importance.pdf`
+
+The outputs are written under `outputs/preoperative_from_gridsearch/<target>/<model>/`.
+
 ## 🧠 Inference (Loading Saved Weights)
 
 The script automatically saves the entire trained pipeline (imputers, scalers, encoders, and the model itself) as `pipeline.joblib`. 
