@@ -1,4 +1,4 @@
-# MedModel Training Pipeline
+# SBM Stratify Training Pipeline
 
 A streamlined, robust, and highly configurable machine learning pipeline for medical tabular data. It handles both classification and regression automatically, supports complex temporal/predefined splitting strategies, trains Scikit-Learn and PyTorch models, and exports publication-ready scientific plots.
 

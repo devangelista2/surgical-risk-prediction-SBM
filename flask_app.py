@@ -47,7 +47,7 @@ plt.rcParams.update({
 })
 
 app = Flask(__name__)
-app.secret_key = "medmodel-studio-2024"
+app.secret_key = "sbm-stratify-2024"
 LAUNCH_JOBS: dict[str, dict[str, Any]] = {}
 LAUNCH_JOBS_LOCK = threading.Lock()
 

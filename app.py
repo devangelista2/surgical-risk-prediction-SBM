@@ -39,7 +39,7 @@ plt.rcParams.update(
 
 
 st.set_page_config(
-    page_title="MedModel Studio",
+    page_title="SBM Stratify",
     page_icon=":material/monitoring:",
     layout="wide",
     initial_sidebar_state="collapsed",
@@ -1473,7 +1473,7 @@ def main() -> None:
         f"""
         <div class="hero">
             <div class="eyebrow">Training Studio</div>
-            <h1>MedModel Interface for Feature Reduction</h1>
+            <h1>SBM Stratify Interface for Feature Reduction</h1>
             <p>
                 Build reduced clinical feature sets, launch training with the project’s saved
                 grid-search optima, and review outcome metrics plus permutation importance in one place.
