@@ -14,7 +14,10 @@
       "Bash(.venv/Scripts/python.exe -c \"import flask; print\\(flask.__version__\\)\")",
       "Bash(.venv/Scripts/python.exe -c \"import flask; import pandas; import numpy; print\\(''OK''\\)\")",
       "Bash(timeout 5 .venv/Scripts/python.exe -c \":*)",
-      "Bash(timeout 8 .venv/Scripts/python.exe -c \":*)"
+      "Bash(timeout 8 .venv/Scripts/python.exe -c \":*)",
+      "Bash(grep -E '\\\\.\\(py|ipynb\\)$')",
+      "Bash(.venv/bin/python -c \"import doctor_app; print\\('Import OK'\\)\" 2>&1)",
+      "Bash(.venv/bin/python -c \"\nfrom doctor_app import discover_presets, get_preset_metadata, load_doctor_settings\nimport json\n\npresets = discover_presets\\(\\)\nprint\\('Presets found:', len\\(presets\\)\\)\nfor p in presets[:3]:\n    print\\(' -', p['name'], '|', p['target_count'], 'targets'\\)\n\nprint\\(\\)\nif presets:\n    meta = get_preset_metadata\\(presets[0]['run_path']\\)\n    if meta:\n        print\\('Feature count:', len\\(meta['features']\\)\\)\n        print\\('Targets:', [t['name'] for t in meta['targets']]\\)\n        print\\(\\)\n        print\\('Sample features:'\\)\n        for f in meta['features'][:6]:\n            print\\(f'  {f[\\\\\"name\\\\\"]:40s} type={f[\\\\\"type\\\\\"]:10s} group={f[\\\\\"group\\\\\"]}'\\)\n\" 2>&1)"
     ]
   }
 }

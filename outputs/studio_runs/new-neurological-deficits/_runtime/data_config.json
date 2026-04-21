@@ -1,0 +1,27 @@
+{
+    "input_file": "./data/SBM1212.xlsx",
+    "input_features": [
+        "Age",
+        "Comorbidities_Cardiorespiratory",
+        "Comorbidities_Other Tumors",
+        "Charlson Comorbidity Index",
+        "Symptoms_Incidental finding",
+        "Symptoms_CN deficits",
+        "Pre-Op KPS",
+        "Radio_Tumor Location",
+        "Radio_Tumor side",
+        "Radio_Pre-Op max_axial_diam_mm",
+        "Radio_Hyperostosis",
+        "Radio_Vessel_encasement",
+        "Optic Canal invasion",
+        "Optic nerve/chiasm compression",
+        "ICA/Syphon involvment"
+    ],
+    "cols_string": [
+        "Radio_Tumor Location",
+        "Radio_Tumor side",
+        "Radio_Vessel_encasement"
+    ],
+    "cols_date": [],
+    "cols_multi": []
+}

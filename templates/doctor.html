@@ -1,0 +1,1585 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SBM — Surgical Risk Assessment</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+/* ─── Reset & base ─────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --blue:        #1d4ed8;
+  --blue-light:  #dbeafe;
+  --blue-mid:    #3b82f6;
+  --surface:     #f8fafc;
+  --card:        #ffffff;
+  --border:      #e2e8f0;
+  --border-soft: #f1f5f9;
+  --text:        #0f172a;
+  --text-2:      #334155;
+  --text-3:      #64748b;
+  --text-4:      #94a3b8;
+  --green:       #16a34a;
+  --amber:       #d97706;
+  --red:         #dc2626;
+  --shadow-sm:   0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.05);
+  --shadow-md:   0 4px 12px rgba(0,0,0,.08), 0 2px 6px rgba(0,0,0,.05);
+  --shadow-lg:   0 12px 32px rgba(0,0,0,.10), 0 4px 12px rgba(0,0,0,.06);
+  --radius-sm:   8px;
+  --radius:      12px;
+  --radius-lg:   18px;
+  --transition:  .18s ease;
+}
+
+html { font-size: 15px; }
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  background: var(--surface);
+  color: var(--text);
+  line-height: 1.5;
+  min-height: 100vh;
+}
+
+/* ─── Layout ───────────────────────────────────────────────────────────────── */
+.app-header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: .85rem 2rem;
+  background: rgba(255,255,255,.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+  box-shadow: 0 1px 0 var(--border);
+}
+
+.header-left { display: flex; align-items: center; gap: .85rem; }
+
+.logo-mark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: var(--blue);
+  color: #fff;
+  font-weight: 700;
+  font-size: .8rem;
+  letter-spacing: .04em;
+  flex-shrink: 0;
+}
+
+.app-title   { font-size: 1rem; font-weight: 600; color: var(--text); }
+.app-subtitle { font-size: .78rem; color: var(--text-3); margin-top: 1px; }
+
+.icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  color: var(--text-3);
+  cursor: pointer;
+  transition: var(--transition);
+}
+.icon-btn:hover { border-color: var(--blue-mid); color: var(--blue); background: var(--blue-light); }
+
+.app-main {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 2.5rem 1.5rem 4rem;
+}
+
+/* ─── Section transitions ──────────────────────────────────────────────────── */
+.app-section { animation: fadeIn .22s ease; }
+.app-section.hidden { display: none !important; }
+
+@keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+/* ─── Preset cards ─────────────────────────────────────────────────────────── */
+.section-lead { margin-bottom: 1.75rem; }
+.section-lead h2 { font-size: 1.4rem; font-weight: 600; letter-spacing: -.02em; }
+.section-lead p  { color: var(--text-3); margin-top: .35rem; font-size: .92rem; }
+
+.preset-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1rem;
+}
+
+.preset-card {
+  background: var(--card);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 1.4rem 1.5rem;
+  cursor: pointer;
+  transition: box-shadow var(--transition), border-color var(--transition), transform var(--transition);
+  display: flex;
+  flex-direction: column;
+  gap: .55rem;
+}
+.preset-card:hover {
+  border-color: var(--blue-mid);
+  box-shadow: var(--shadow-md), 0 0 0 3px var(--blue-light);
+  transform: translateY(-2px);
+}
+
+.preset-card-icon {
+  width: 38px; height: 38px;
+  border-radius: 10px;
+  background: var(--blue-light);
+  color: var(--blue);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.1rem;
+}
+.preset-card-name { font-weight: 600; font-size: .97rem; }
+.preset-card-meta { font-size: .8rem; color: var(--text-3); display: flex; align-items: center; gap: .4rem; }
+.preset-card-meta .dot { width: 4px; height: 4px; border-radius: 50%; background: var(--text-4); }
+.preset-badge {
+  display: inline-block;
+  padding: .18rem .5rem;
+  border-radius: 999px;
+  background: var(--blue-light);
+  color: var(--blue);
+  font-size: .72rem;
+  font-weight: 500;
+}
+
+.loading-msg { color: var(--text-3); font-size: .93rem; padding: 1.5rem 0; }
+
+/* ─── Form ─────────────────────────────────────────────────────────────────── */
+.form-top {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 2rem;
+  flex-wrap: wrap;
+}
+.form-top h2 { font-size: 1.3rem; font-weight: 600; letter-spacing: -.02em; }
+.form-top p  { color: var(--text-3); font-size: .88rem; margin-top: 2px; }
+
+.btn-back {
+  display: flex; align-items: center; gap: .4rem;
+  padding: .45rem .85rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  color: var(--text-2);
+  font-size: .85rem;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: var(--transition);
+  flex-shrink: 0;
+}
+.btn-back:hover { border-color: var(--blue-mid); color: var(--blue); }
+
+/* Form group accordion */
+.form-group {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  margin-bottom: .9rem;
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+.form-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem;
+  cursor: pointer;
+  user-select: none;
+  transition: background var(--transition);
+}
+.form-group-header:hover { background: var(--border-soft); }
+
+.form-group-title {
+  display: flex; align-items: center; gap: .6rem;
+  font-weight: 600; font-size: .93rem; color: var(--text);
+}
+.form-group-icon {
+  width: 28px; height: 28px;
+  border-radius: 7px;
+  background: var(--blue-light);
+  color: var(--blue);
+  display: flex; align-items: center; justify-content: center;
+  font-size: .85rem;
+}
+.form-group-count {
+  font-size: .75rem;
+  font-weight: 500;
+  color: var(--text-3);
+  background: var(--border-soft);
+  padding: .1rem .45rem;
+  border-radius: 999px;
+}
+.form-group-chevron {
+  color: var(--text-4);
+  font-size: .8rem;
+  transition: transform var(--transition);
+}
+.form-group.collapsed .form-group-chevron { transform: rotate(-90deg); }
+.form-group.collapsed .form-group-body { display: none; }
+
+.form-group-body { padding: 0 1.25rem 1.25rem; border-top: 1px solid var(--border-soft); }
+
+/* Checkbox grid for booleans */
+/* Toggle switches — pure CSS, no JS needed */
+.bool-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: .45rem .7rem;
+  padding-top: .9rem;
+}
+
+/* The <label> is the entire clickable card */
+.toggle-item {
+  display: flex;
+  align-items: center;
+  gap: .7rem;
+  padding: .6rem .8rem;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  background: var(--card);
+  transition: border-color var(--transition), background var(--transition);
+  user-select: none;
+}
+.toggle-item:hover { border-color: var(--blue-mid); background: #f0f5ff; }
+
+/* Hide the native checkbox — the label click still toggles it */
+.toggle-item input[type=checkbox] {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+/* Track */
+.toggle-track {
+  flex-shrink: 0;
+  position: relative;
+  width: 36px;
+  height: 20px;
+  border-radius: 10px;
+  background: #cbd5e1;
+  transition: background .18s;
+}
+
+/* Thumb */
+.toggle-track::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0,0,0,.25);
+  transition: transform .18s cubic-bezier(.4,0,.2,1);
+}
+
+/* Checked state — driven entirely by CSS */
+.toggle-item input:checked + .toggle-track {
+  background: var(--blue);
+}
+.toggle-item input:checked + .toggle-track::after {
+  transform: translateX(16px);
+}
+.toggle-item:has(input:checked) {
+  border-color: #93c5fd;
+  background: #eff6ff;
+}
+
+.toggle-label {
+  font-size: .85rem;
+  color: var(--text-2);
+  line-height: 1.3;
+  flex: 1;
+}
+
+/* Numeric / select / date fields */
+.fields-stack { padding-top: .9rem; display: flex; flex-direction: column; gap: .7rem; }
+
+.field-row {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  flex-wrap: wrap;
+}
+.field-label-wrap { flex: 0 0 200px; }
+.field-label {
+  font-size: .88rem;
+  font-weight: 500;
+  color: var(--text-2);
+  display: block;
+}
+.field-unit { font-size: .78rem; color: var(--text-4); display: block; margin-top: 1px; }
+.field-hint { font-size: .75rem; color: var(--text-3); font-style: italic; margin-top: 2px; max-width: 380px; }
+
+.field-input-wrap { flex: 1; min-width: 130px; display: flex; align-items: center; gap: .5rem; }
+
+input[type=number], input[type=date], select {
+  width: 100%;
+  padding: .5rem .75rem;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  color: var(--text);
+  font-family: inherit;
+  font-size: .88rem;
+  appearance: none;
+  -webkit-appearance: none;
+  transition: border-color var(--transition);
+  outline: none;
+}
+input[type=number]:focus, input[type=date]:focus, select:focus {
+  border-color: var(--blue-mid);
+  box-shadow: 0 0 0 3px var(--blue-light);
+}
+input[type=number] { max-width: 140px; }
+select { cursor: pointer; max-width: 260px; }
+
+/* Sex / radio group */
+.sex-group { display: flex; gap: .5rem; }
+.sex-opt {
+  flex: 1; max-width: 110px;
+  padding: .45rem .75rem;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  text-align: center;
+  font-size: .85rem;
+  font-weight: 500;
+  color: var(--text-3);
+  cursor: pointer;
+  transition: var(--transition);
+  user-select: none;
+}
+.sex-opt:hover { border-color: var(--blue-mid); color: var(--blue); }
+.sex-opt.active {
+  border-color: var(--blue);
+  background: var(--blue-light);
+  color: var(--blue);
+  font-weight: 600;
+}
+
+/* ─── Form submit ──────────────────────────────────────────────────────────── */
+.form-footer {
+  margin-top: 1.75rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.btn-predict {
+  padding: .85rem 2.5rem;
+  background: var(--blue);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius);
+  font-family: inherit;
+  font-size: .95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--transition), box-shadow var(--transition);
+  box-shadow: 0 4px 14px rgba(29, 78, 216, .35);
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+}
+.btn-predict:hover   { background: #1e40af; box-shadow: 0 6px 20px rgba(29, 78, 216, .45); }
+.btn-predict:active  { background: #1e3a8a; }
+.btn-predict:disabled { opacity: .55; cursor: not-allowed; box-shadow: none; }
+
+.spinner {
+  width: 16px; height: 16px;
+  border: 2px solid rgba(255,255,255,.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin .6s linear infinite;
+  display: none;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.btn-predict.loading .spinner { display: block; }
+.btn-predict.loading .btn-txt  { opacity: .7; }
+
+.form-disclaimer {
+  font-size: .78rem;
+  color: var(--text-4);
+  max-width: 460px;
+}
+
+/* ─── Results ──────────────────────────────────────────────────────────────── */
+.results-top {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 2rem;
+  flex-wrap: wrap;
+}
+.results-top h2 { font-size: 1.3rem; font-weight: 600; letter-spacing: -.02em; }
+.results-top .spacer { flex: 1; }
+
+.btn-new {
+  padding: .5rem 1.2rem;
+  border: 1.5px solid var(--blue);
+  border-radius: var(--radius-sm);
+  background: var(--blue-light);
+  color: var(--blue);
+  font-family: inherit;
+  font-size: .85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+}
+.btn-new:hover { background: var(--blue); color: #fff; }
+
+.risk-cards { display: flex; flex-direction: column; gap: 1rem; }
+
+.risk-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 1.35rem 1.5rem;
+  box-shadow: var(--shadow-sm);
+  animation: fadeIn .28s ease both;
+}
+
+.risk-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: .85rem;
+  gap: .75rem;
+  flex-wrap: wrap;
+}
+.risk-title { font-weight: 600; font-size: 1rem; color: var(--text); }
+.risk-desc  { font-size: .8rem; color: var(--text-3); margin-top: 3px; }
+
+.risk-right { display: flex; align-items: center; gap: .75rem; flex-shrink: 0; }
+.risk-pct {
+  font-size: 1.9rem;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -.03em;
+}
+.risk-badge {
+  padding: .32rem .8rem;
+  border-radius: 999px;
+  font-size: .78rem;
+  font-weight: 600;
+  letter-spacing: .02em;
+  text-transform: uppercase;
+}
+.risk-badge.low      { background: #dcfce7; color: #15803d; }
+.risk-badge.moderate { background: #fef9c3; color: #a16207; }
+.risk-badge.high     { background: #fee2e2; color: #b91c1c; }
+
+/* Risk bar */
+.risk-bar-wrap { position: relative; }
+.risk-track {
+  position: relative;
+  width: 100%;
+  height: 10px;
+  background: var(--border);
+  border-radius: 99px;
+  overflow: visible;
+  margin: .5rem 0 .35rem;
+}
+.risk-fill {
+  position: absolute;
+  left: 0; top: 0;
+  height: 100%;
+  border-radius: 99px;
+  background: linear-gradient(90deg,
+    #16a34a   0%,
+    #65a30d  25%,
+    #ca8a04  50%,
+    #ea580c  72%,
+    #dc2626 100%
+  );
+  transition: width .9s cubic-bezier(.4,0,.2,1);
+  min-width: 6px;
+}
+
+/* Threshold tick marks on the bar */
+.risk-tick {
+  position: absolute;
+  top: -3px;
+  width: 2px;
+  height: 16px;
+  border-radius: 1px;
+  background: var(--text-4);
+  transform: translateX(-50%);
+}
+.risk-tick-label {
+  position: absolute;
+  top: 16px;
+  font-size: .68rem;
+  color: var(--text-4);
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+
+.risk-bar-scale {
+  display: flex;
+  justify-content: space-between;
+  font-size: .72rem;
+  color: var(--text-4);
+  margin-top: .15rem;
+}
+
+.risk-model-note {
+  font-size: .75rem;
+  color: var(--text-4);
+  margin-top: .65rem;
+  display: flex;
+  align-items: center;
+  gap: .35rem;
+}
+
+.risk-card.error {
+  border-color: #fca5a5;
+  background: #fff5f5;
+}
+.risk-card.error .risk-title { color: var(--red); }
+.error-msg { font-size: .85rem; color: #b91c1c; margin-top: .4rem; }
+
+/* Model picker */
+.model-picker { margin-top: .9rem; border: 1.5px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; }
+.model-picker summary {
+  display: flex; align-items: center; gap: .45rem;
+  padding: .5rem .8rem; font-size: .8rem; font-weight: 600;
+  color: var(--text-2); cursor: pointer; user-select: none;
+  list-style: none; background: var(--surface);
+}
+.model-picker summary::-webkit-details-marker { display: none; }
+.model-picker summary::after { content: "▸"; margin-left: auto; transition: transform .18s; }
+.model-picker[open] summary::after { transform: rotate(90deg); }
+.model-picker summary:hover { background: var(--border); }
+.model-list { display: flex; flex-direction: column; gap: 0; }
+.model-opt {
+  display: flex; align-items: center; gap: .7rem;
+  padding: .5rem .9rem; cursor: pointer; border-top: 1px solid var(--border);
+  transition: background .12s; font-size: .82rem;
+}
+.model-opt:hover { background: #f0f7ff; }
+.model-opt input[type=radio] { accent-color: var(--blue); width: 14px; height: 14px; flex-shrink: 0; }
+.model-opt-name { flex: 1; color: var(--text-1); }
+.model-opt-auc {
+  font-size: .78rem; font-weight: 600; color: var(--text-2);
+  background: var(--surface); padding: .15rem .45rem;
+  border-radius: 999px; border: 1px solid var(--border);
+  white-space: nowrap;
+}
+.model-opt.is-best .model-opt-name::after {
+  content: " ★"; font-size: .72rem; color: var(--amber);
+}
+.model-opt input:checked ~ .model-opt-name { color: var(--blue); font-weight: 600; }
+
+/* Clinical disclaimer */
+.clinical-note {
+  margin-top: 1.75rem;
+  padding: 1rem 1.25rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--border-soft);
+  font-size: .8rem;
+  color: var(--text-3);
+  line-height: 1.55;
+}
+.clinical-note strong { color: var(--text-2); }
+
+/* ─── Settings panel ───────────────────────────────────────────────────────── */
+.settings-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15,23,42,.2);
+  backdrop-filter: blur(2px);
+  z-index: 200;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity .2s;
+  pointer-events: none;
+}
+.settings-overlay.open { opacity: 1; pointer-events: all; }
+
+.settings-panel {
+  position: fixed;
+  top: 0; right: 0;
+  width: min(420px, 100vw);
+  height: 100vh;
+  background: var(--card);
+  border-left: 1px solid var(--border);
+  z-index: 210;
+  overflow-y: auto;
+  padding: 1.5rem;
+  box-shadow: -8px 0 32px rgba(0,0,0,.12);
+  transform: translateX(100%);
+  transition: transform .25s cubic-bezier(.4,0,.2,1);
+}
+.settings-panel.open { transform: none; }
+
+.settings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.75rem;
+}
+.settings-header h3 { font-size: 1.05rem; font-weight: 700; }
+
+.settings-section { margin-bottom: 2rem; }
+.settings-section h4 {
+  font-size: .82rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .07em;
+  color: var(--text-3);
+  margin-bottom: .9rem;
+  padding-bottom: .5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.threshold-row {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  margin-bottom: .5rem;
+}
+.threshold-label { font-size: .87rem; color: var(--text-2); margin-bottom: .4rem; }
+.threshold-value {
+  font-size: .88rem;
+  font-weight: 600;
+  color: var(--blue);
+  min-width: 38px;
+  text-align: right;
+}
+
+input[type=range] {
+  -webkit-appearance: none;
+  flex: 1;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--border);
+  outline: none;
+  cursor: pointer;
+}
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  background: var(--blue);
+  box-shadow: 0 0 0 3px var(--blue-light);
+  cursor: pointer;
+}
+
+.threshold-preview {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  flex-wrap: wrap;
+  margin-top: .75rem;
+  padding: .75rem;
+  background: var(--border-soft);
+  border-radius: var(--radius-sm);
+  font-size: .78rem;
+  color: var(--text-3);
+}
+.threshold-preview .risk-badge { font-size: .72rem; }
+
+.settings-select-label { font-size: .87rem; color: var(--text-2); margin-bottom: .45rem; display: block; }
+.settings-select {
+  width: 100%;
+  max-width: 100%;
+  padding: .55rem .75rem;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  color: var(--text);
+  font-family: inherit;
+  font-size: .85rem;
+  cursor: pointer;
+  outline: none;
+}
+.settings-select:focus { border-color: var(--blue-mid); }
+
+.btn-primary {
+  width: 100%;
+  padding: .75rem;
+  background: var(--blue);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-family: inherit;
+  font-size: .9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--transition);
+}
+.btn-primary:hover { background: #1e40af; }
+
+.settings-saved-msg {
+  font-size: .78rem;
+  color: var(--green);
+  text-align: center;
+  margin-top: .6rem;
+  height: 1.2em;
+  transition: opacity .3s;
+}
+
+/* ─── Config visibility list ──────────────────────────────────────────────── */
+.config-vis-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .75rem;
+  padding: .55rem .7rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  margin-bottom: .45rem;
+  background: var(--card);
+  transition: background var(--transition);
+}
+.config-vis-item.is-hidden { background: var(--border-soft); opacity: .72; }
+.config-vis-name { font-size: .85rem; color: var(--text-2); flex: 1; min-width: 0; }
+.config-vis-name small { display: block; font-size: .73rem; color: var(--text-4); margin-top: 1px; }
+.btn-vis-toggle {
+  flex-shrink: 0;
+  padding: .3rem .7rem;
+  border-radius: var(--radius-sm);
+  font-family: inherit;
+  font-size: .75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+  border: 1.5px solid;
+}
+.btn-vis-toggle.visible {
+  border-color: var(--border);
+  background: var(--border-soft);
+  color: var(--text-3);
+}
+.btn-vis-toggle.visible:hover { border-color: var(--red); color: var(--red); background: #fff5f5; }
+.btn-vis-toggle.hidden-btn {
+  border-color: var(--green);
+  background: #f0fdf4;
+  color: var(--green);
+}
+.btn-vis-toggle.hidden-btn:hover { background: var(--green); color: #fff; }
+
+/* ─── Toast notification ───────────────────────────────────────────────────── */
+.toast {
+  position: fixed;
+  bottom: 1.5rem;
+  left: 50%;
+  transform: translateX(-50%) translateY(8px);
+  background: var(--text);
+  color: #fff;
+  padding: .65rem 1.25rem;
+  border-radius: var(--radius);
+  font-size: .85rem;
+  font-weight: 500;
+  opacity: 0;
+  transition: opacity .2s, transform .2s;
+  pointer-events: none;
+  z-index: 300;
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* ─── Responsive ───────────────────────────────────────────────────────────── */
+@media (max-width: 600px) {
+  .app-header { padding: .75rem 1rem; }
+  .app-main   { padding: 1.5rem 1rem 3rem; }
+  .form-group-body { padding: 0 .9rem 1rem; }
+  .field-label-wrap { flex: 0 0 100%; }
+  .field-input-wrap { width: 100%; }
+  input[type=number] { max-width: 100%; }
+  select { max-width: 100%; }
+  .bool-grid { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<!-- ── Header ──────────────────────────────────────────────────────────────── -->
+<header class="app-header">
+  <div class="header-left">
+    <div class="logo-mark">SBM</div>
+    <div>
+      <div class="app-title">Surgical Risk Assessment</div>
+      <div class="app-subtitle">Skull Base Meningioma · Decision Support Tool</div>
+    </div>
+  </div>
+  <button class="icon-btn" id="settings-btn" title="Settings" aria-label="Open settings">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+    </svg>
+  </button>
+</header>
+
+<!-- ── Main ────────────────────────────────────────────────────────────────── -->
+<main class="app-main">
+
+  <!-- Step 1 · Preset selection -->
+  <section id="section-preset" class="app-section">
+    <div class="section-lead">
+      <h2>Select Assessment Configuration</h2>
+      <p>Choose the trained model set you wish to use for this patient evaluation.</p>
+    </div>
+    <div id="preset-grid" class="preset-grid">
+      <div class="loading-msg">Loading available configurations…</div>
+    </div>
+  </section>
+
+  <!-- Step 2 · Patient data form -->
+  <section id="section-form" class="app-section hidden">
+    <div class="form-top">
+      <button class="btn-back" id="btn-back-to-presets">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg>
+        Back
+      </button>
+      <div>
+        <h2 id="form-heading">Patient Data Entry</h2>
+        <p id="form-subtitle" style="color:var(--text-3);font-size:.88rem;margin-top:2px;"></p>
+      </div>
+    </div>
+    <div id="form-groups-container"></div>
+    <div class="form-footer">
+      <button class="btn-predict" id="btn-predict">
+        <span class="spinner" id="predict-spinner"></span>
+        <span class="btn-txt">Calculate Risk</span>
+      </button>
+      <p class="form-disclaimer">All fields with a default value are pre-filled. Change only what applies to this patient.</p>
+    </div>
+  </section>
+
+  <!-- Step 3 · Results -->
+  <section id="section-results" class="app-section hidden">
+    <div class="results-top">
+      <button class="btn-back" id="btn-back-to-form">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg>
+        Edit Data
+      </button>
+      <div>
+        <h2>Risk Assessment Results</h2>
+        <p id="results-subtitle" style="color:var(--text-3);font-size:.88rem;margin-top:2px;"></p>
+      </div>
+      <div class="spacer"></div>
+      <button class="btn-new" id="btn-new-assessment">New Assessment</button>
+    </div>
+    <div id="risk-cards" class="risk-cards"></div>
+    <div class="clinical-note">
+      <strong>Clinical notice:</strong> These predictions are decision-support tools intended to augment, not replace, clinical judgement. Risk estimates reflect statistical patterns in historical data and must be interpreted alongside the full clinical picture, imaging, and patient preferences.
+    </div>
+  </section>
+
+</main>
+
+<!-- ── Settings panel ──────────────────────────────────────────────────────── -->
+<div class="settings-overlay" id="settings-overlay"></div>
+<div class="settings-panel" id="settings-panel" role="dialog" aria-label="Settings">
+  <div class="settings-header">
+    <h3>Settings</h3>
+    <button class="icon-btn" id="settings-close" aria-label="Close settings">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+  </div>
+
+  <!-- Risk threshold sliders -->
+  <div class="settings-section">
+    <h4>Risk Thresholds</h4>
+    <div class="threshold-label">Low / Moderate boundary</div>
+    <div class="threshold-row">
+      <input type="range" id="sl-low" min="5" max="70" step="5" value="30">
+      <span class="threshold-value" id="sl-low-val">30%</span>
+    </div>
+    <div class="threshold-label" style="margin-top:.65rem;">Moderate / High boundary</div>
+    <div class="threshold-row">
+      <input type="range" id="sl-high" min="20" max="95" step="5" value="60">
+      <span class="threshold-value" id="sl-high-val">60%</span>
+    </div>
+    <div class="threshold-preview" id="threshold-preview">
+      <span class="risk-badge low">Low</span>
+      <span id="tp-low-range">0 – 30%</span>
+      <span class="risk-badge moderate">Moderate</span>
+      <span id="tp-mid-range">30 – 60%</span>
+      <span class="risk-badge high">High</span>
+      <span id="tp-high-range">60 – 100%</span>
+    </div>
+  </div>
+
+  <!-- Configuration selector -->
+  <div class="settings-section">
+    <h4>Model Configuration</h4>
+    <label class="settings-select-label" for="settings-preset">Active configuration</label>
+    <select id="settings-preset" class="settings-select"></select>
+  </div>
+
+  <!-- Manage visibility -->
+  <div class="settings-section">
+    <h4>Manage Configurations</h4>
+    <p style="font-size:.82rem;color:var(--text-3);margin-bottom:.9rem;line-height:1.5;">
+      Hidden configurations are preserved on disk but not shown on the main screen.
+    </p>
+    <div id="config-visibility-list"></div>
+  </div>
+
+  <button class="btn-primary" id="settings-save-btn">Save Settings</button>
+  <div class="settings-saved-msg" id="settings-saved-msg"></div>
+</div>
+
+<!-- ── Toast ────────────────────────────────────────────────────────────────── -->
+<div class="toast" id="toast"></div>
+
+<!-- ── App script ───────────────────────────────────────────────────────────── -->
+<script>
+/* ─────────────────────────────────────────────────────────────────────────────
+   State
+───────────────────────────────────────────────────────────────────────────── */
+const state = {
+  presets:        [],       // visible presets (shown on main screen)
+  allPresets:     [],       // all presets including hidden (used in settings panel)
+  settings:       { low_threshold: 0.30, high_threshold: 0.60, default_run_path: "", hidden_runs: [] },
+  preset:         null,     // currently selected preset object
+  meta:           null,     // { features, targets }
+  modelOverrides: {},       // { target_name: model_name } — user-selected models
+  targetModels:   {},       // { target_name: [{model, label, roc_auc, is_best}] }
+  lastFeatures:   null,     // last submitted feature values (for re-prediction on model switch)
+};
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Utilities
+───────────────────────────────────────────────────────────────────────────── */
+function $(id) { return document.getElementById(id); }
+
+function showSection(id) {
+  ['section-preset','section-form','section-results'].forEach(s => {
+    const el = $(s);
+    if (el) el.classList.toggle('hidden', s !== id);
+  });
+}
+
+function showToast(msg, ms = 2800) {
+  const t = $('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), ms);
+}
+
+function getRiskClass(prob, low, high) {
+  if (prob < low)  return 'low';
+  if (prob < high) return 'moderate';
+  return 'high';
+}
+function getRiskLabel(cls) {
+  return { low: 'Low Risk', moderate: 'Moderate Risk', high: 'High Risk' }[cls];
+}
+
+function pct(v) { return Math.round(v * 100); }
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   API helpers
+───────────────────────────────────────────────────────────────────────────── */
+async function apiFetch(url, opts) {
+  const r = await fetch(url, opts);
+  if (!r.ok) {
+    const j = await r.json().catch(() => ({}));
+    throw new Error(j.error || `HTTP ${r.status}`);
+  }
+  return r.json();
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Initialisation
+───────────────────────────────────────────────────────────────────────────── */
+async function init() {
+  try {
+    // Load visible presets for the main screen
+    const visData = await apiFetch('/api/doctor/presets');
+    state.presets  = visData.presets  || [];
+    state.settings = visData.settings || state.settings;
+
+    // Load all presets (including hidden) for the settings panel
+    const allData  = await apiFetch('/api/doctor/presets?include_hidden=true');
+    state.allPresets = allData.presets || [];
+
+    renderPresets();
+    applySettings(state.settings);
+    populateSettingsPresets();
+  } catch(e) {
+    $('preset-grid').innerHTML =
+      `<div class="loading-msg" style="color:var(--red)">Failed to load configurations: ${e.message}</div>`;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Preset selection screen
+───────────────────────────────────────────────────────────────────────────── */
+const ICONS = ['🏥','📊','🧬','⚕️','🔬','📋','🩺'];
+
+function renderPresets() {
+  const grid = $('preset-grid');
+  if (!state.presets.length) {
+    grid.innerHTML = `<div class="loading-msg">No trained model configurations found in the outputs directory.</div>`;
+    return;
+  }
+  grid.innerHTML = state.presets.map((p, i) => `
+    <div class="preset-card" data-run="${escHtml(p.run_path)}" tabindex="0" role="button" aria-label="Select ${p.name}">
+      <div class="preset-card-icon">${ICONS[i % ICONS.length]}</div>
+      <div class="preset-card-name">${escHtml(p.name)}</div>
+      <div class="preset-card-meta">
+        <span>${p.target_count} outcome${p.target_count !== 1 ? 's' : ''}</span>
+        <span class="dot"></span>
+        <span class="preset-badge">Click to open</span>
+      </div>
+      <div style="font-size:.78rem;color:var(--text-4);margin-top:.2rem;">${escHtml(p.targets.join(' · '))}</div>
+    </div>
+  `).join('');
+
+  grid.querySelectorAll('.preset-card').forEach(card => {
+    card.addEventListener('click', () => selectPreset(card.dataset.run));
+    card.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') selectPreset(card.dataset.run); });
+  });
+}
+
+async function selectPreset(runPath) {
+  try {
+    const meta = await apiFetch(`/api/doctor/preset-meta?run_path=${encodeURIComponent(runPath)}`);
+    state.preset        = state.presets.find(p => p.run_path === runPath) || { name: runPath };
+    state.meta          = meta;
+    state.modelOverrides = {};
+    state.targetModels   = {};
+    state.lastFeatures   = null;
+    $('form-heading').textContent = state.preset.name;
+    $('form-subtitle').textContent =
+      `${meta.features.length} input field${meta.features.length !== 1 ? 's' : ''} · ${meta.targets.length} outcome${meta.targets.length !== 1 ? 's' : ''}`;
+    renderForm(meta.features);
+    showSection('section-form');
+  } catch(e) {
+    showToast(`Could not load preset: ${e.message}`);
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Dynamic form generation
+───────────────────────────────────────────────────────────────────────────── */
+const GROUP_ICONS = {
+  'Demographics':             '🧑',
+  'Functional Status':        '📈',
+  'Comorbidities':            '🏥',
+  'Presenting Symptoms':      '🔍',
+  'Imaging Findings':         '🖼',
+  'Vascular Involvement':     '🩸',
+  'Cranial Nerves & Brainstem':'🧠',
+  'Surgical Details':         '🔧',
+  'Administrative':           '📋',
+  'Other':                    '•',
+};
+
+function renderForm(features) {
+  const container = $('form-groups-container');
+  container.innerHTML = '';
+
+  // Group features
+  const groups = {};
+  features.forEach(f => {
+    if (!groups[f.group]) groups[f.group] = [];
+    groups[f.group].push(f);
+  });
+
+  Object.entries(groups).forEach(([groupName, fields]) => {
+    const booleans = fields.filter(f => f.type === 'boolean');
+    const others   = fields.filter(f => f.type !== 'boolean');
+
+    const section = document.createElement('div');
+    section.className = 'form-group';
+    section.dataset.group = groupName;
+
+    const icon = GROUP_ICONS[groupName] || '•';
+    section.innerHTML = `
+      <div class="form-group-header">
+        <div class="form-group-title">
+          <span class="form-group-icon">${icon}</span>
+          ${escHtml(groupName)}
+          <span class="form-group-count">${fields.length}</span>
+        </div>
+        <span class="form-group-chevron">▾</span>
+      </div>
+      <div class="form-group-body">
+        ${others.length  ? renderFieldRows(others)   : ''}
+        ${booleans.length ? renderBoolGrid(booleans) : ''}
+      </div>
+    `;
+
+    section.querySelector('.form-group-header').addEventListener('click', () => {
+      section.classList.toggle('collapsed');
+    });
+
+    container.appendChild(section);
+  });
+
+  // After render, attach sex toggle listeners and bool item listeners
+  container.querySelectorAll('.sex-opt').forEach(opt => {
+    opt.addEventListener('click', () => {
+      const wrap = opt.closest('.sex-group');
+      wrap.querySelectorAll('.sex-opt').forEach(o => o.classList.remove('active'));
+      opt.classList.add('active');
+    });
+  });
+
+}
+
+function renderFieldRows(fields) {
+  return `<div class="fields-stack">${fields.map(f => renderField(f)).join('')}</div>`;
+}
+
+function renderField(f) {
+  const unitSpan  = f.unit  ? `<span class="field-unit">${escHtml(f.unit)}</span>` : '';
+  const hintSpan  = f.hint  ? `<div class="field-hint">${escHtml(f.hint)}</div>` : '';
+
+  let input = '';
+
+  if (f.type === 'date') {
+    input = `<input type="date" id="f_${escId(f.name)}" data-feat="${escHtml(f.name)}" value="${escHtml(f.default || '')}">`;
+
+  } else if (f.type === 'select') {
+    const opts = (f.options || []).map(o =>
+      `<option value="${escHtml(o)}"${o === f.default ? ' selected' : ''}>${escHtml(o)}</option>`
+    ).join('');
+    input = `<select id="f_${escId(f.name)}" data-feat="${escHtml(f.name)}">${opts}</select>`;
+
+  } else if (f.type === 'sex') {
+    const opts = (f.options || ['Female','Male']).map((label, i) => {
+      const val = (f.option_values || [0,1])[i];
+      const active = (val === f.default) ? ' active' : '';
+      return `<div class="sex-opt${active}" data-value="${val}">${escHtml(label)}</div>`;
+    }).join('');
+    input = `<div class="sex-group" id="f_${escId(f.name)}" data-feat="${escHtml(f.name)}" data-type="sex">${opts}</div>`;
+
+  } else {
+    // numeric
+    const min  = f.min  !== undefined ? ` min="${f.min}"`   : '';
+    const max  = f.max  !== undefined ? ` max="${f.max}"`   : '';
+    const step = f.step !== undefined ? ` step="${f.step}"` : '';
+    const def  = f.default !== undefined ? ` value="${f.default}"` : '';
+    input = `<input type="number" id="f_${escId(f.name)}" data-feat="${escHtml(f.name)}"${min}${max}${step}${def}>`;
+  }
+
+  return `
+    <div class="field-row">
+      <div class="field-label-wrap">
+        <label class="field-label" for="f_${escId(f.name)}">${escHtml(f.label)}</label>
+        ${unitSpan}
+      </div>
+      <div class="field-input-wrap">
+        ${input}
+        ${hintSpan}
+      </div>
+    </div>`;
+}
+
+function renderBoolGrid(fields) {
+  return `<div class="bool-grid">${fields.map(f => `
+    <label class="toggle-item">
+      <input type="checkbox" data-feat="${escHtml(f.name)}"${f.default ? ' checked' : ''}>
+      <span class="toggle-track"></span>
+      <span class="toggle-label">${escHtml(f.label)}</span>
+    </label>`).join('')}</div>`;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Collect form values
+───────────────────────────────────────────────────────────────────────────── */
+function collectFormValues() {
+  const values = {};
+  const container = $('form-groups-container');
+
+  // Numeric + date + select fields
+  container.querySelectorAll('[data-feat]').forEach(el => {
+    const feat = el.dataset.feat;
+
+    if (el.dataset.type === 'sex') {
+      const active = el.querySelector('.sex-opt.active');
+      values[feat] = active ? Number(active.dataset.value) : 0;
+    } else if (el.tagName === 'INPUT' || el.tagName === 'SELECT') {
+      const v = el.value;
+      if (v === '' || v === null || v === undefined) {
+        values[feat] = null;
+      } else if (el.type === 'number') {
+        values[feat] = parseFloat(v);
+      } else {
+        values[feat] = v;
+      }
+    }
+  });
+
+  // Boolean checkboxes
+  container.querySelectorAll('input[type=checkbox][data-feat]').forEach(cb => {
+    values[cb.dataset.feat] = cb.checked ? 1 : 0;
+  });
+
+  return values;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Prediction & results
+───────────────────────────────────────────────────────────────────────────── */
+async function runPrediction() {
+  const btn = $('btn-predict');
+  const spinner = $('predict-spinner');
+  btn.disabled = true;
+  btn.classList.add('loading');
+  spinner.style.display = 'block';
+
+  try {
+    const features  = collectFormValues();
+    state.lastFeatures = features;
+    const run_path  = state.meta.run_path;
+    const resp      = await apiFetch('/api/doctor/predict', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ run_path, features, model_overrides: state.modelOverrides }),
+    });
+
+    renderResults(resp.results);
+    $('results-subtitle').textContent =
+      `${state.preset.name} · ${resp.results.length} outcome${resp.results.length !== 1 ? 's' : ''} evaluated`;
+    showSection('section-results');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+
+    // Fetch model lists for all non-error targets in background
+    fetchTargetModels(resp.results, run_path);
+  } catch(e) {
+    showToast(`Prediction failed: ${e.message}`, 4000);
+  } finally {
+    btn.disabled = false;
+    btn.classList.remove('loading');
+    spinner.style.display = 'none';
+  }
+}
+
+async function fetchTargetModels(results, run_path) {
+  const targets = results.filter(r => !r.error).map(r => r.target);
+  await Promise.all(targets.map(async (target) => {
+    try {
+      const resp = await apiFetch(`/api/doctor/target-models?run_path=${encodeURIComponent(run_path)}&target=${encodeURIComponent(target)}`);
+      state.targetModels[target] = resp.models || [];
+      populateModelPicker(target, resp.models || []);
+    } catch(e) { /* silently ignore */ }
+  }));
+}
+
+function populateModelPicker(target, models) {
+  const picker = document.querySelector(`.model-picker[data-target="${CSS.escape(target)}"]`);
+  if (!picker) return;
+  const list = picker.querySelector('.model-list');
+  if (!list) return;
+  const currentModel = state.modelOverrides[target] || models.find(m => m.is_best)?.model || models[0]?.model;
+  list.innerHTML = models.map(m => {
+    const aucStr = m.roc_auc != null ? `AUC ${m.roc_auc.toFixed(3)}` : 'AUC —';
+    return `<label class="model-opt${m.is_best ? ' is-best' : ''}">
+      <input type="radio" name="model-${escHtml(target)}" value="${escHtml(m.model)}"${m.model === currentModel ? ' checked' : ''}>
+      <span class="model-opt-name">${escHtml(m.label)}</span>
+      <span class="model-opt-auc">${aucStr}</span>
+    </label>`;
+  }).join('');
+  list.querySelectorAll('input[type=radio]').forEach(radio => {
+    radio.addEventListener('change', () => onModelChange(target, radio.value));
+  });
+}
+
+async function onModelChange(target, modelName) {
+  if (!state.lastFeatures) return;
+  state.modelOverrides[target] = modelName;
+  try {
+    const resp = await apiFetch('/api/doctor/predict', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        run_path: state.meta.run_path,
+        features: state.lastFeatures,
+        model_overrides: state.modelOverrides,
+      }),
+    });
+    renderResults(resp.results);
+    // Re-populate pickers from existing state (models already fetched)
+    resp.results.filter(r => !r.error).forEach(r => {
+      if (state.targetModels[r.target]) {
+        populateModelPicker(r.target, state.targetModels[r.target]);
+      }
+    });
+  } catch(e) {
+    showToast(`Re-prediction failed: ${e.message}`, 3000);
+  }
+}
+
+function renderResults(results) {
+  const low  = state.settings.low_threshold;
+  const high = state.settings.high_threshold;
+  const container = $('risk-cards');
+
+  container.innerHTML = results.map((r, i) => {
+    if (r.error) {
+      return `
+        <div class="risk-card error" style="animation-delay:${i * .08}s">
+          <div class="risk-title">${escHtml(r.label || r.target)}</div>
+          <div class="error-msg">⚠ ${escHtml(r.error)}</div>
+        </div>`;
+    }
+
+    const prob  = r.probability;
+    const cls   = getRiskClass(prob, low, high);
+    const label = getRiskLabel(cls);
+    const fillPct = Math.max(2, Math.min(100, Math.round(prob * 100)));
+    const lowPct  = Math.round(low  * 100);
+    const highPct = Math.round(high * 100);
+    const modelThPct = Math.round(r.model_threshold * 100);
+    const modelPrediction = prob >= r.model_threshold ? 'Positive' : 'Negative';
+
+    const colorMap = { low: 'var(--green)', moderate: 'var(--amber)', high: 'var(--red)' };
+    const pctColor = colorMap[cls];
+
+    return `
+      <div class="risk-card" style="animation-delay:${i * .1}s">
+        <div class="risk-card-top">
+          <div>
+            <div class="risk-title">${escHtml(r.label)}</div>
+            ${r.description ? `<div class="risk-desc">${escHtml(r.description)}</div>` : ''}
+          </div>
+          <div class="risk-right">
+            <div class="risk-pct" style="color:${pctColor}">${fillPct}%</div>
+            <div class="risk-badge ${cls}">${label}</div>
+          </div>
+        </div>
+
+        <div class="risk-bar-wrap">
+          <div class="risk-track" id="track-${i}">
+            <div class="risk-fill" id="fill-${i}" style="width:0%"></div>
+            <div class="risk-tick" style="left:${lowPct}%">
+              <div class="risk-tick-label">${lowPct}%</div>
+            </div>
+            <div class="risk-tick" style="left:${highPct}%">
+              <div class="risk-tick-label">${highPct}%</div>
+            </div>
+          </div>
+          <div class="risk-bar-scale">
+            <span>0%</span><span>25%</span><span>50%</span><span>75%</span><span>100%</span>
+          </div>
+        </div>
+
+        <div class="risk-model-note">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          Model: <strong>${escHtml((r.model || '').toUpperCase())}</strong>
+          &nbsp;·&nbsp; Trained threshold: <strong>${modelThPct}%</strong>
+          &nbsp;·&nbsp; Model prediction: <strong>${modelPrediction}</strong>
+        </div>
+
+        <details class="model-picker" data-target="${escHtml(r.target)}">
+          <summary>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="9 18 15 12 9 6"/></svg>
+            Change model
+          </summary>
+          <div class="model-list"><em style="padding:.6rem .9rem;font-size:.8rem;color:var(--text-2);display:block">Loading models…</em></div>
+        </details>
+      </div>`;
+  }).join('');
+
+  // Animate bars after paint
+  requestAnimationFrame(() => {
+    results.forEach((r, i) => {
+      if (!r.error) {
+        const fill = $(`fill-${i}`);
+        if (fill) {
+          const pct = Math.max(2, Math.min(100, Math.round(r.probability * 100)));
+          setTimeout(() => { fill.style.width = pct + '%'; }, 60 + i * 80);
+        }
+      }
+    });
+  });
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Settings panel
+───────────────────────────────────────────────────────────────────────────── */
+function openSettings() {
+  // Sync sliders to current state
+  $('sl-low').value  = Math.round(state.settings.low_threshold  * 100);
+  $('sl-high').value = Math.round(state.settings.high_threshold * 100);
+  updateThresholdDisplay();
+  renderConfigVisibilityList();
+  $('settings-overlay').classList.add('open');
+  $('settings-panel').classList.add('open');
+}
+
+function closeSettings() {
+  $('settings-overlay').classList.remove('open');
+  $('settings-panel').classList.remove('open');
+}
+
+function updateThresholdDisplay() {
+  const lo = parseInt($('sl-low').value,  10);
+  const hi = parseInt($('sl-high').value, 10);
+  $('sl-low-val').textContent  = lo + '%';
+  $('sl-high-val').textContent = hi + '%';
+  $('tp-low-range').textContent  = `0 – ${lo}%`;
+  $('tp-mid-range').textContent  = `${lo} – ${hi}%`;
+  $('tp-high-range').textContent = `${hi} – 100%`;
+}
+
+function applySettings(settings) {
+  state.settings = { ...state.settings, ...settings };
+  $('sl-low').value  = Math.round(state.settings.low_threshold  * 100);
+  $('sl-high').value = Math.round(state.settings.high_threshold * 100);
+  updateThresholdDisplay();
+}
+
+function populateSettingsPresets() {
+  const sel = $('settings-preset');
+  sel.innerHTML = state.allPresets.map(p =>
+    `<option value="${escHtml(p.run_path)}"${p.run_path === state.settings.default_run_path ? ' selected' : ''}>${escHtml(p.name)}${p.hidden ? ' (hidden)' : ''}</option>`
+  ).join('');
+}
+
+function renderConfigVisibilityList() {
+  const container = $('config-visibility-list');
+  if (!container) return;
+  if (!state.allPresets.length) {
+    container.innerHTML = `<div style="font-size:.82rem;color:var(--text-4);">No configurations found.</div>`;
+    return;
+  }
+  container.innerHTML = state.allPresets.map(p => `
+    <div class="config-vis-item${p.hidden ? ' is-hidden' : ''}" id="vis-item-${escId(p.run_path)}">
+      <div class="config-vis-name">
+        ${escHtml(p.name)}
+        <small>${p.target_count} outcome${p.target_count !== 1 ? 's' : ''}</small>
+      </div>
+      <button class="btn-vis-toggle ${p.hidden ? 'hidden-btn' : 'visible'}"
+              data-run="${escHtml(p.run_path)}"
+              data-hidden="${p.hidden}">
+        ${p.hidden ? 'Show' : 'Hide'}
+      </button>
+    </div>
+  `).join('');
+
+  container.querySelectorAll('.btn-vis-toggle').forEach(btn => {
+    btn.addEventListener('click', () => togglePresetVisibility(btn.dataset.run));
+  });
+}
+
+async function togglePresetVisibility(runPath) {
+  try {
+    await apiFetch('/api/doctor/presets/toggle-hidden', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ run_path: runPath }),
+    });
+    // Reload all presets (including hidden) to refresh the panel
+    await refreshAllPresets();
+    renderConfigVisibilityList();
+    populateSettingsPresets();
+    // Rebuild main grid with only visible presets
+    state.presets = state.allPresets.filter(p => !p.hidden);
+    renderPresets();
+  } catch(e) {
+    showToast(`Could not toggle visibility: ${e.message}`);
+  }
+}
+
+async function refreshAllPresets() {
+  const data = await apiFetch('/api/doctor/presets?include_hidden=true');
+  state.allPresets = data.presets || [];
+  state.settings   = data.settings || state.settings;
+}
+
+async function saveSettings() {
+  const lo = parseInt($('sl-low').value,  10) / 100;
+  const hi = parseInt($('sl-high').value, 10) / 100;
+  const run = $('settings-preset').value;
+  try {
+    const saved = await apiFetch('/api/doctor/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ low_threshold: lo, high_threshold: hi, default_run_path: run }),
+    });
+    applySettings(saved);
+    const msg = $('settings-saved-msg');
+    msg.textContent = '✓ Settings saved';
+    setTimeout(() => { msg.textContent = ''; }, 2500);
+  } catch(e) {
+    showToast(`Could not save settings: ${e.message}`);
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Escape helpers
+───────────────────────────────────────────────────────────────────────────── */
+function escHtml(s) {
+  if (s == null) return '';
+  return String(s)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;')
+    .replace(/'/g,'&#39;');
+}
+function escId(s) {
+  return String(s).replace(/[^a-zA-Z0-9_-]/g, '_');
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Event wiring
+───────────────────────────────────────────────────────────────────────────── */
+document.addEventListener('DOMContentLoaded', () => {
+  init();
+
+  $('settings-btn').addEventListener('click', openSettings);
+  $('settings-close').addEventListener('click', closeSettings);
+  $('settings-overlay').addEventListener('click', closeSettings);
+
+  $('sl-low').addEventListener('input', () => {
+    const lo = parseInt($('sl-low').value,  10);
+    const hi = parseInt($('sl-high').value, 10);
+    if (lo >= hi) $('sl-low').value = hi - 5;
+    updateThresholdDisplay();
+  });
+  $('sl-high').addEventListener('input', () => {
+    const lo = parseInt($('sl-low').value,  10);
+    const hi = parseInt($('sl-high').value, 10);
+    if (hi <= lo) $('sl-high').value = lo + 5;
+    updateThresholdDisplay();
+  });
+
+  $('settings-save-btn').addEventListener('click', saveSettings);
+
+  $('btn-back-to-presets').addEventListener('click', () => showSection('section-preset'));
+  $('btn-back-to-form').addEventListener('click',    () => showSection('section-form'));
+  $('btn-new-assessment').addEventListener('click',  () => {
+    state.preset = null;
+    state.meta   = null;
+    showSection('section-preset');
+  });
+
+  $('btn-predict').addEventListener('click', runPrediction);
+
+  // Allow Enter key on preset cards
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') closeSettings();
+  });
+});
+</script>
+</body>
+</html>

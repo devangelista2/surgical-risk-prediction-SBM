@@ -1,0 +1,16 @@
+{
+  "low_threshold": 0.3,
+  "high_threshold": 0.6,
+  "default_run_path": "/home/tivogatto/surgical-risk-prediction-SBM/outputs/preoperative_from_gridsearch",
+  "hidden_runs": [
+    "/home/tivogatto/surgical-risk-prediction-SBM/outputs/gridsearch_eval",
+    "/home/tivogatto/surgical-risk-prediction-SBM/outputs/preoperative_from_gridsearch",
+    "/home/tivogatto/surgical-risk-prediction-SBM/outputs/studio_runs/20260420-202244-all-features",
+    "/home/tivogatto/surgical-risk-prediction-SBM/outputs/studio_runs/20260420-202410-all-features",
+    "/home/tivogatto/surgical-risk-prediction-SBM/outputs/studio_runs/20260420-203553-studio-run",
+    "/home/tivogatto/surgical-risk-prediction-SBM/outputs/studio_runs/20260420-222221-reduced-complications30d",
+    "/home/tivogatto/surgical-risk-prediction-SBM/outputs/studio_runs/20260421-073628-reduced-kps-discharge",
+    "/home/tivogatto/surgical-risk-prediction-SBM/outputs/studio_runs/20260421-073905-reduced-new-neurological-deficits",
+    "/home/tivogatto/surgical-risk-prediction-SBM/outputs/studio_runs/20260421-074059-reduced-severe-complication"
+  ]
+}

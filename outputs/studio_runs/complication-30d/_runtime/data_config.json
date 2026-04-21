@@ -1,0 +1,26 @@
+{
+    "input_file": "./data/SBM1212.xlsx",
+    "input_features": [
+        "Comorbidities_Hyperlipidemia",
+        "Comorbidities_Hypertension",
+        "Comorbidities_DM",
+        "Symptoms_Incidental finding",
+        "Symptoms_Acute onset (1<month)",
+        "Symptoms_Motor deficits",
+        "Pre-Op KPS",
+        "Radio_Tumor Location",
+        "Radio_Pre-Op max_axial_diam_mm",
+        "Radio_Ventricle involment",
+        "Radio_Calcification",
+        "Radio_Dural_tail",
+        "Radio_Hyperostosis",
+        "Radio_Vessel_encasement",
+        "ICA/Syphon involvment"
+    ],
+    "cols_string": [
+        "Radio_Tumor Location",
+        "Radio_Vessel_encasement"
+    ],
+    "cols_date": [],
+    "cols_multi": []
+}
