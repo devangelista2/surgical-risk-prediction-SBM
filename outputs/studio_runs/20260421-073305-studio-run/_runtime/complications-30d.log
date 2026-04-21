@@ -1,0 +1,15 @@
+2026-04-21 07:33:17 - INFO - Loading data from ./data/SBM1212.xlsx...
+Traceback (most recent call last):
+  File "/Users/davideevangelista/surgical-risk-prediction-SBM/src/train.py", line 906, in <module>
+    main()
+  File "/Users/davideevangelista/surgical-risk-prediction-SBM/src/train.py", line 565, in main
+    df = pd.read_excel(input_file_path)
+  File "/Users/davideevangelista/surgical-risk-prediction-SBM/.venv/lib/python3.10/site-packages/pandas/io/excel/_base.py", line 495, in read_excel
+    io = ExcelFile(
+  File "/Users/davideevangelista/surgical-risk-prediction-SBM/.venv/lib/python3.10/site-packages/pandas/io/excel/_base.py", line 1550, in __init__
+    ext = inspect_excel_format(
+  File "/Users/davideevangelista/surgical-risk-prediction-SBM/.venv/lib/python3.10/site-packages/pandas/io/excel/_base.py", line 1402, in inspect_excel_format
+    with get_handle(
+  File "/Users/davideevangelista/surgical-risk-prediction-SBM/.venv/lib/python3.10/site-packages/pandas/io/common.py", line 882, in get_handle
+    handle = open(handle, ioargs.mode)
+FileNotFoundError: [Errno 2] No such file or directory: './data/SBM1212.xlsx'

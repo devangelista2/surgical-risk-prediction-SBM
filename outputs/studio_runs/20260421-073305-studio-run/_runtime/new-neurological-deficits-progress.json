@@ -1,0 +1,10 @@
+{
+  "status": "running",
+  "target": "New neurological deficits",
+  "total_models": 5,
+  "completed_models": 0,
+  "current_model": null,
+  "current_step": "Loading data...",
+  "message": "Loading dataset and preparing split...",
+  "updated_at": "2026-04-21T05:33:14Z"
+}

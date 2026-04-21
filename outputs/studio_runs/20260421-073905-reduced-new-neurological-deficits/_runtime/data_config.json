@@ -1,0 +1,42 @@
+{
+    "input_file": "./data/SBM1212.xlsx",
+    "input_features": [
+        "Sex",
+        "Age",
+        "Comorbidities_Cardiorespiratory",
+        "Comorbidities_Other Tumors",
+        "Comorbidities_Hypertension",
+        "Comorbidities_DM",
+        "Charlson Comorbidity Index",
+        "ASA",
+        "Symptoms_Incidental finding",
+        "Symptoms_Seizure",
+        "Symptoms_Motor deficits",
+        "Symptoms_CN deficits",
+        "Symptoms_Visual deficits",
+        "Symptoms_Cognitive/psychiatrist disorder",
+        "Symptoms_Hyperprolatinemia",
+        "Pre-Op KPS",
+        "Radio_Tumor Location",
+        "Radio_Tumor side",
+        "Radio_Pre-Op max_axial_diam_mm",
+        "Radio_Ventricle involment",
+        "Radio_Midline shift entity",
+        "Radio_Calcification",
+        "Radio_Edema",
+        "Radio_Dural_tail",
+        "Radio_Hyperostosis",
+        "Radio_Bone_invasion",
+        "Radio_Vessel_encasement",
+        "Optic Canal invasion",
+        "Optic nerve/chiasm compression",
+        "ICA/Syphon involvment"
+    ],
+    "cols_string": [
+        "Radio_Tumor Location",
+        "Radio_Tumor side",
+        "Radio_Vessel_encasement"
+    ],
+    "cols_date": [],
+    "cols_multi": []
+}

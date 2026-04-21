@@ -1,0 +1,6 @@
+Traceback (most recent call last):
+  File "/Users/davideevangelista/surgical-risk-prediction-SBM/src/train.py", line 42, in <module>
+    from nn.torch_ft_transformer import (
+  File "/Users/davideevangelista/surgical-risk-prediction-SBM/src/nn/torch_ft_transformer.py", line 6, in <module>
+    import torch
+ModuleNotFoundError: No module named 'torch'
