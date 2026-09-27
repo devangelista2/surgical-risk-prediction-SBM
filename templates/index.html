@@ -789,7 +789,7 @@ textarea:focus { border-color: rgba(34,211,238,.38); }
    STATE
 ────────────────────────────────────────────────────────── */
 const S = {
-  datasets: [], dataset: '', profile: null,
+  local: true, datasets: [], dataset: '', profile: null,
   defaultSearchSpace: {}, types: {},
   allFeatures: [], allTargets: [], allModels: [],
   groups: [], groupMap: {},
@@ -826,12 +826,19 @@ function rebuildGroups() {
 async function boot() {
   try {
     const cfg = await api('/api/config');
+    S.local = cfg.local;
     S.datasets = cfg.datasets;
     S.defaultSearchSpace = cfg.search_space;
     resetSearchSpace();
     S.selModels = [...S.allModels];
     renderModelPills();
     refreshRuns();
+    if (!S.local) {
+      // Hosted copy: no uploads or training, results only.
+      document.querySelector('.tbnav-btn').style.display = 'none';
+      switchTab('results');
+      return;
+    }
     renderDatasetSel();
     if (S.datasets.length) await selectDataset(S.datasets[0]);
     else renderAll();
@@ -864,9 +871,11 @@ async function api(url, opts = {}) {
 
   if (!r.ok) {
     const text = await r.text();
-    let msg = text;
-    try { msg = JSON.parse(text).error || text; } catch (_) {}
-    throw new Error(msg);
+    let body = {};
+    try { body = JSON.parse(text); } catch (_) {}
+    const err = new Error(body.error || text);
+    err.problems = body.problems || [];
+    throw err;
   }
   return r.json();
 }
@@ -1280,6 +1289,7 @@ async function launchTraining() {
 
   showLoader('Starting training job…');
   try {
+    document.getElementById('launchOut').innerHTML = '';
     const res = await postJson('/api/launch', settings);
     hideLoader();
     S.activeLaunchJob = res;
@@ -1288,7 +1298,13 @@ async function launchTraining() {
     document.getElementById('launchOut').innerHTML = '';
     toast('Training started. Progress will update automatically.', 'ok');
     startLaunchPolling(res.job_id);
-  } catch(e) { hideLoader(); toast('Launch failed: '+e.message,'err'); }
+  } catch(e) {
+    hideLoader();
+    toast('Launch failed: '+e.message,'err');
+    if (e.problems?.length) document.getElementById('launchOut').innerHTML =
+      `<div class="hint" style="border-color:rgba(248,113,113,.35)"><strong style="color:var(--red)">Training did not start</strong><ul style="margin:.4rem 0 0 1.1rem">` +
+      e.problems.map(p => `<li>${esc(p)}</li>`).join('') + '</ul></div>';
+  }
 }
 
 function startLaunchPolling(jobId) {
@@ -1515,7 +1531,7 @@ function renderResults(data) {
    FREEZE
 ────────────────────────────────────────────────────────── */
 function renderFreeze(data) {
-  if (!data.targets?.length) return '';
+  if (!S.local || !data.targets?.length) return '';
   const name = data.run_path.split(/[\\/]/).pop();
   const rows = data.targets.map(t => `<tr><td>${esc(t.target)}</td><td>
     <select class="freeze-pick" data-target="${esc(t.target)}">
@@ -1606,7 +1622,9 @@ function toast(msg, type='info') {
   el.className='toast '+type;
   el.innerHTML=`<span class="toast-dot"></span><span>${esc(msg)}</span>`;
   document.getElementById('ts').appendChild(el);
-  setTimeout(()=>el.remove(), 4200);
+  // Errors stay until clicked so they are not missed.
+  if (type === 'err') { el.title = 'Click to dismiss'; el.style.cursor = 'pointer'; el.onclick = () => el.remove(); }
+  else setTimeout(()=>el.remove(), 4200);
 }
 
 /* ──────────────────────────────────────────────────────────

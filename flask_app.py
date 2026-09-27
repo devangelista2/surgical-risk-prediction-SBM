@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import copy
+import functools
 import hashlib
 import json
 import os
@@ -49,6 +50,8 @@ TUNING_CACHE_ROOT = OUTPUTS_ROOT / "tuning_cache"
 FREEZES_ROOT = OUTPUTS_ROOT / "freezes"
 SEARCH_SPACE_PATH = CONFIG_DIR / "grid_search.json"
 DATASET_SUFFIXES = {".xlsx", ".xls", ".csv"}
+# Hugging Face sets SPACE_ID on a Space; uploads and training stay off there so patient data never reaches its disk.
+ON_SPACE = bool(os.environ.get("SPACE_ID"))
 EXPORT_DPI = 150
 TRAINING_IMPORT_CHECK = "import joblib, numpy, openpyxl, pandas, sklearn, tqdm"
 
@@ -187,6 +190,16 @@ def slugify(value: str) -> str:
     return slug or "run"
 
 
+def local_only(view):
+    """Refuse the route on a Hugging Face Space."""
+    @functools.wraps(view)
+    def wrapped(*args, **kwargs):
+        if ON_SPACE:
+            return jsonify({"error": "Uploads, training and freezing work only on a local copy."}), 403
+        return view(*args, **kwargs)
+    return wrapped
+
+
 def list_datasets() -> list[str]:
     if not DATA_ROOT.exists():
         return []
@@ -308,6 +321,72 @@ def build_training_plan(settings: dict[str, Any], search_space: dict[str, Any]) 
                 to_tune.append(model)
         plan.append({"target": target, "cached": cached, "to_tune": to_tune})
     return plan
+
+
+def preflight(settings: dict[str, Any], df: pd.DataFrame) -> list[str]:
+    """Plain-language problems that would make tuning or training fail."""
+    features, targets = settings["selected_features"], settings["targets"]
+    missing = [c for c in targets + features if c not in df.columns]
+    if missing:
+        return [f"'{c}' is not a column in the dataset." for c in missing]
+
+    problems = []
+    date_col = settings["date_column"]
+    dates = None
+    if date_col not in df.columns:
+        problems.append(f"Date column '{date_col}' is not in the dataset. Tuning sorts patients by it; "
+                        "set the right column under Advanced training settings.")
+    else:
+        dates = pd.Series(pd.to_datetime(df[date_col].astype(str), errors="coerce", format="mixed"), index=df.index)
+        if dates.notna().mean() < 0.5:
+            problems.append(f"Date column '{date_col}' has too few readable dates.")
+            dates = None
+    if settings["split_strategy"] == "predefined" and settings["split_column"] not in df.columns:
+        problems.append(f"Split column '{settings['split_column']}' is not in the dataset.")
+
+    typed = set(settings["cols_string"] + settings["cols_date"] + settings["cols_multi"])
+    for f in features:
+        col = pd.Series(df[f])
+        if bool(col.isna().all()):
+            problems.append(f"'{f}' is empty in every row.")
+        elif f not in typed:
+            text = col.notna() & pd.Series(pd.to_numeric(col, errors="coerce"), index=col.index).isna()
+            if bool(text.any()):
+                problems.append(f"'{f}' is read as a number but holds text such as '{col.loc[text].iloc[0]}'. "
+                                "Read it as Categories under Advanced: column types, or fix the data.")
+
+    test_size, val_size = float(settings["test_size"]), float(settings["threshold_val_size"])
+    for t in targets:
+        y = df[t].dropna()
+        if y.nunique() < 2:
+            problems.append(f"Outcome '{t}' has only one value, so there is nothing to predict.")
+            continue
+        if y.value_counts().min() < 10:
+            problems.append(f"Outcome '{t}' has fewer than 10 patients in its smaller group, too few to train on.")
+            continue
+        if dates is None:
+            continue
+        # Tuning and training both hold out the most recent patients; each slice needs both outcomes.
+        mask = dates.notna() & df[t].notna()
+        ordered = df.loc[mask, t].loc[dates.loc[mask].sort_values(kind="stable").index]
+        n_test = int(len(ordered) * test_size)
+        n_val = int((len(ordered) - n_test) * val_size)
+        test = ordered.iloc[len(ordered) - n_test:]
+        val = ordered.iloc[len(ordered) - n_test - n_val:len(ordered) - n_test]
+        for label, part in (("test", test), ("validation", val)):
+            if part.nunique() < 2:
+                problems.append(f"Outcome '{t}' has only one value among the {len(part)} patients in the {label} "
+                                "slice (sorted by date). Lower the test or validation size, or pick another outcome.")
+    return problems
+
+
+def failure_reason(log: str) -> str:
+    """The most telling line of a failed script's log."""
+    lines = [line.strip() for line in log.splitlines() if line.strip()]
+    for line in reversed(lines):
+        if "Error" in line or "Failed" in line:
+            return line[-300:]
+    return lines[-1][-300:] if lines else "The script stopped without output."
 
 
 FREEZE_FILES = ("pipeline.joblib", "decision_policy.json", "metrics.json")
@@ -780,7 +859,7 @@ def run_training_job(
                 update_launch_execution_row(
                     execution_rows, target, status="failed", returncode=None,
                     log="\n\n".join(logs)[-4000:],
-                    message="No model could be tuned. See console log.",
+                    message="No model could be tuned: " + failure_reason("\n".join(logs)),
                 )
                 update_launch_job(job_id, execution=copy.deepcopy(execution_rows),
                                   completed_units=completed_units, completed_targets=i + 1)
@@ -811,13 +890,19 @@ def run_training_job(
             )
             logs.append(log)
             completed_units += planned
+            # train.py logs a model that fails and carries on with the rest.
+            model_failures = [line.split(" - ")[-1].strip() for line in log.splitlines() if "Failed to train" in line]
+            if rc != 0:
+                message = "Failed: " + failure_reason(log)
+            else:
+                message = "; ".join(model_failures)
             update_launch_execution_row(
                 execution_rows, target,
                 status="ok" if rc == 0 else "failed",
                 models=", ".join(models),
                 returncode=rc,
                 log="\n\n".join(logs)[-4000:],
-                message="" if rc == 0 else "Training subprocess failed. See console log.",
+                message=message,
             )
             update_launch_job(
                 job_id,
@@ -868,12 +953,14 @@ def index():
 @app.route("/api/config")
 def get_config():
     return jsonify({
-        "datasets": list_datasets(),
+        "local": not ON_SPACE,
+        "datasets": [] if ON_SPACE else list_datasets(),
         "search_space": default_search_space(),
     })
 
 
 @app.route("/api/datasets", methods=["POST"])
+@local_only
 def upload_dataset():
     upload = request.files.get("file")
     name = secure_filename(upload.filename or "") if upload else ""
@@ -885,6 +972,7 @@ def upload_dataset():
 
 
 @app.route("/api/dataset/profile")
+@local_only
 def get_dataset_profile():
     try:
         return jsonify(dataset_profile(request.args.get("name", "")))
@@ -907,6 +995,7 @@ def group_distribution_chart():
 
 
 @app.route("/api/launch", methods=["POST"])
+@local_only
 def launch_training():
     data = request.get_json()
     settings: dict[str, Any] = {
@@ -938,6 +1027,9 @@ def launch_training():
     features = set(settings["selected_features"])
     for key in ("cols_string", "cols_date", "cols_multi"):
         settings[key] = [c for c in settings[key] if c in features]
+    problems = preflight(settings, read_table(path))
+    if problems:
+        return jsonify({"error": "Fix these before training.", "problems": problems}), 400
 
     training_python, training_error = resolve_training_python()
     if not training_python:
@@ -1037,6 +1129,7 @@ def run_results():
 
 
 @app.route("/api/freeze", methods=["POST"])
+@local_only
 def create_freeze():
     data = request.get_json()
     run_root = Path(data.get("run_path", ""))
@@ -1049,6 +1142,7 @@ def create_freeze():
 
 
 @app.route("/api/freeze/download")
+@local_only
 def download_freeze():
     name = slugify(request.args.get("name", ""))
     root = FREEZES_ROOT / name
