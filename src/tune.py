@@ -37,6 +37,7 @@ from preprocessing import (
     infer_task_type,
     to_bool_if_binary,
 )
+from train import write_progress
 from utils.logger import logger
 
 warnings.filterwarnings("ignore", category=UserWarning)
@@ -341,6 +342,7 @@ def main():
     parser.add_argument("--f_beta", type=float, default=2.0, help="Beta for F-beta during threshold optimization.")
     parser.add_argument("--fn_cost", type=float, default=5.0, help="Relative cost assigned to each false negative.")
     parser.add_argument("--fp_cost", type=float, default=1.0, help="Relative cost assigned to each false positive.")
+    parser.add_argument("--progress_path", default=None, help="Optional JSON file path used to report tuning progress.")
     args = parser.parse_args()
 
     data_config = load_json(args.data_config)
@@ -401,7 +403,9 @@ def main():
     best_overall_params = {}
     best_selection_details = {}
 
-    for model_name, param_grid in search_space.items():
+    progress_path = Path(args.progress_path) if args.progress_path else None
+
+    for model_idx, (model_name, param_grid) in enumerate(search_space.items()):
         logger.info(f"\n--- Tuning {model_name.upper()} ---")
 
         if model_name not in valid_models:
@@ -425,7 +429,12 @@ def main():
         fail_count = 0
 
         pbar = tqdm(grid, desc=f"Grid Search ({model_name})")
-        for raw_params in pbar:
+        for grid_idx, raw_params in enumerate(pbar):
+            write_progress(progress_path, {
+                "completed_models": model_idx,
+                "current_model": model_name,
+                "current_step": f"Tuning {model_name}: setting {grid_idx + 1} of {len(grid)}",
+            })
             try:
                 params = apply_imbalance_strategy(model_name, task_type, raw_params, y_train)
 
