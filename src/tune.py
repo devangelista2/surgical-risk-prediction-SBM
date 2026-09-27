@@ -430,11 +430,14 @@ def main():
 
         pbar = tqdm(grid, desc=f"Grid Search ({model_name})")
         for grid_idx, raw_params in enumerate(pbar):
-            write_progress(progress_path, {
-                "completed_models": model_idx,
-                "current_model": model_name,
-                "current_step": f"Tuning {model_name}: setting {grid_idx + 1} of {len(grid)}",
-            })
+            try:
+                write_progress(progress_path, {
+                    "completed_models": model_idx,
+                    "current_model": model_name,
+                    "current_step": f"Tuning {model_name}: setting {grid_idx + 1} of {len(grid)}",
+                })
+            except OSError:
+                pass  # Windows refuses the replace while the studio reads the file; the next step writes again.
             try:
                 params = apply_imbalance_strategy(model_name, task_type, raw_params, y_train)
 
