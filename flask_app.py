@@ -6,11 +6,13 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import threading
 import time
 import uuid
+import zipfile
 from datetime import datetime
 from io import BytesIO
 from pathlib import Path
@@ -44,6 +46,7 @@ MODELS_DIR = BASE_DIR / "models"
 OUTPUTS_ROOT = BASE_DIR / "outputs"
 STUDIO_RUNS_ROOT = OUTPUTS_ROOT / "studio_runs"
 TUNING_CACHE_ROOT = OUTPUTS_ROOT / "tuning_cache"
+FREEZES_ROOT = OUTPUTS_ROOT / "freezes"
 SEARCH_SPACE_PATH = CONFIG_DIR / "grid_search.json"
 DATASET_SUFFIXES = {".xlsx", ".xls", ".csv"}
 EXPORT_DPI = 150
@@ -305,6 +308,43 @@ def build_training_plan(settings: dict[str, Any], search_space: dict[str, Any]) 
                 to_tune.append(model)
         plan.append({"target": target, "cached": cached, "to_tune": to_tune})
     return plan
+
+
+FREEZE_FILES = ("pipeline.joblib", "decision_policy.json", "metrics.json")
+
+
+def freeze_run(run_root: Path, picks: dict[str, str], high_pct: float, name: str) -> dict[str, Any]:
+    """Copy one model per outcome into outputs/freezes/<name>/ with a bands.json, in the layout neurosurg-predict loads."""
+    out = FREEZES_ROOT / slugify(name)
+    if out.exists():
+        raise ValueError(f"A freeze named '{out.name}' already exists; pick another name.")
+    bands: dict[str, Any] = {
+        "_comment": (f"'low' is the model's operating threshold; 'high' is the {high_pct:g}th "
+                     "percentile of predicted probability in the test set."),
+    }
+    warnings = []
+    for target, model in picks.items():
+        src = run_root / target / model
+        if src.resolve().parent.parent != run_root.resolve() or not (src / "pipeline.joblib").is_file():
+            raise ValueError(f"{target} / {model} is not a trained model in this run.")
+        policy = load_json(src / "decision_policy.json")
+        if not policy or not (src / "test_predictions.csv").exists():
+            raise ValueError(f"{target} / {model} has no test predictions; retrain it in this studio first.")
+        probs = pd.read_csv(src / "test_predictions.csv")["y_prob"]
+        bands[target] = {
+            "low": round(float(policy["threshold"]), 3),
+            "high": round(float(np.percentile(probs, high_pct)), 3),
+        }
+        data = load_json(run_root / target / "metadata.json").get("data_configuration", {})
+        if model.startswith("torch") or data.get("cols_date") or data.get("cols_multi"):
+            warnings.append(f"{target}: {model} needs this repo's src/ to load, so neurosurg-predict cannot load it.")
+    for target, model in picks.items():
+        (out / target / model).mkdir(parents=True)
+        shutil.copy2(run_root / target / "metadata.json", out / target / "metadata.json")
+        for f in FREEZE_FILES:
+            shutil.copy2(run_root / target / model / f, out / target / model / f)
+    save_json(out / "bands.json", bands)
+    return {"name": out.name, "path": str(out), "bands": bands, "warnings": warnings}
 
 
 # ---------------------------------------------------------------------------
@@ -994,6 +1034,33 @@ def run_results():
         return jsonify(results)
     except Exception as exc:
         return jsonify({"error": str(exc)}), 500
+
+
+@app.route("/api/freeze", methods=["POST"])
+def create_freeze():
+    data = request.get_json()
+    run_root = Path(data.get("run_path", ""))
+    try:
+        return jsonify(freeze_run(
+            run_root, data.get("picks", {}), float(data.get("high_pct", 90)), data.get("name") or run_root.name,
+        ))
+    except (ValueError, OSError) as exc:
+        return jsonify({"error": str(exc)}), 400
+
+
+@app.route("/api/freeze/download")
+def download_freeze():
+    name = slugify(request.args.get("name", ""))
+    root = FREEZES_ROOT / name
+    if not root.is_dir():
+        return jsonify({"error": "Freeze not found"}), 404
+    buf = BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for p in root.rglob("*"):
+            if p.is_file():
+                zf.write(p, p.relative_to(root))
+    buf.seek(0)
+    return send_file(buf, mimetype="application/zip", as_attachment=True, download_name=f"{name}.zip")
 
 
 @app.route("/api/image")

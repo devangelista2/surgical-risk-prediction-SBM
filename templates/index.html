@@ -795,7 +795,7 @@ const S = {
   groups: [], groupMap: {},
   selTargets: [], selModels: [], selFeatures: [],
   runNameEdited: false,
-  runs: [],
+  runs: [], shownRun: null,
   activeLaunchJob: null,
   launchPollTimer: null,
 };
@@ -1431,7 +1431,8 @@ async function loadRun() {
   try {
     const d = await api('/api/run/results?path='+encodeURIComponent(path));
     hideLoader();
-    document.getElementById('explorerOut').innerHTML = renderResults(d);
+    S.shownRun = d.run_path;
+    document.getElementById('explorerOut').innerHTML = renderResults(d) + renderFreeze(d);
   } catch(e) { hideLoader(); toast('Load failed: '+e.message,'err'); }
 }
 
@@ -1508,6 +1509,64 @@ function renderResults(data) {
       </div>`).join('')}
     </div>
   </div>`).join('');
+}
+
+/* ──────────────────────────────────────────────────────────
+   FREEZE
+────────────────────────────────────────────────────────── */
+function renderFreeze(data) {
+  if (!data.targets?.length) return '';
+  const name = data.run_path.split(/[\\/]/).pop();
+  const rows = data.targets.map(t => `<tr><td>${esc(t.target)}</td><td>
+    <select class="freeze-pick" data-target="${esc(t.target)}">
+      <option value="">— Leave out —</option>
+      ${t.models.map(m => `<option value="${esc(m.name)}" ${m.name.toUpperCase()===t.cards.best_model?'selected':''}>
+        ${esc(m.name)}${m.metrics.roc_auc ? ' · AUROC ' + esc(m.metrics.roc_auc) : ''}</option>`).join('')}
+    </select></td></tr>`).join('');
+  return `
+  <div class="card mt2">
+    <div class="card-label">Freeze · One Model per Outcome</div>
+    <div class="sc-cap mb1">Copies each chosen model, its threshold and its risk bands into <code>outputs/freezes/</code>, in the layout neurosurg-predict loads. Copying it there stays a manual step.</div>
+    <div class="tbl-wrap mb1"><table class="dtbl"><thead><tr><th>Outcome</th><th>Model</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <div class="g2">
+      <div><label class="fl">Freeze name</label><input type="text" id="freezeName" value="${esc(name)}" /></div>
+    </div>
+    <details class="mt1">
+      <summary>Advanced freeze settings</summary>
+      <div class="adv-grid">
+        <div class="sld-wrap">
+          <div class="sld-head"><span class="sld-lbl">High band percentile</span><span class="sld-val" id="v-hp">90</span></div>
+          <input type="range" id="highPct" min="50" max="99" step="1" value="90" oninput="sv('v-hp',+this.value,0)"/>
+          <div class="sc-cap">Low band: below the model's threshold. High band: at or above this percentile of test-set risk.</div>
+        </div>
+      </div>
+    </details>
+    <button class="btn-cta mt1" onclick="freezeRun()">Freeze Selected Models</button>
+    <div id="freezeOut" class="mt1"></div>
+  </div>`;
+}
+
+async function freezeRun() {
+  const picks = {};
+  document.querySelectorAll('.freeze-pick').forEach(s => { if (s.value) picks[s.dataset.target] = s.value; });
+  if (!Object.keys(picks).length) { toast('Pick at least one model.', 'err'); return; }
+  showLoader('Freezing models…');
+  try {
+    const d = await postJson('/api/freeze', {
+      run_path: S.shownRun, picks,
+      name: document.getElementById('freezeName').value,
+      high_pct: +document.getElementById('highPct').value,
+    });
+    hideLoader();
+    const bands = Object.entries(d.bands).filter(([k]) => k !== '_comment')
+      .map(([outcome, b]) => ({outcome, model: picks[outcome], low: b.low, high: b.high}));
+    document.getElementById('freezeOut').innerHTML = `
+      <div class="hint mb1"><strong>Frozen to</strong> <code>${esc(d.path)}</code></div>
+      ${d.warnings.map(w => `<div class="hint mb05" style="color:var(--amber)">${esc(w)}</div>`).join('')}
+      <div class="tbl-wrap mb1">${tbl(['outcome','model','low','high'], bands)}</div>
+      <a class="btn" href="/api/freeze/download?name=${encodeURIComponent(d.name)}">Download zip</a>`;
+    toast('Freeze written.', 'ok');
+  } catch(e) { hideLoader(); toast('Freeze failed: ' + e.message, 'err'); }
 }
 
 function nodata() { return '<div class="hint" style="color:var(--t3)">Not available.</div>'; }
