@@ -1,27 +1,37 @@
 from __future__ import annotations
 
+import base64
 import copy
+import hashlib
 import json
 import os
 import re
 import subprocess
 import sys
-import base64
 import threading
 import time
 import uuid
-from io import BytesIO
 from datetime import datetime
+from io import BytesIO
 from pathlib import Path
 from typing import Any
 
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from flask import Flask, jsonify, render_template, request, send_file, Response
+from flask import (
+    Flask,
+    Response,
+    jsonify,
+    render_template,
+    request,
+    send_file,
+)
+from werkzeug.utils import secure_filename
 
 # ---------------------------------------------------------------------------
 # Paths
@@ -29,10 +39,13 @@ from flask import Flask, jsonify, render_template, request, send_file, Response
 BASE_DIR = Path(__file__).resolve().parent
 SRC_DIR = BASE_DIR / "src"
 CONFIG_DIR = BASE_DIR / "configs"
-GRIDSEARCH_ROOT = BASE_DIR / "gridsearch" / "preoperative"
+DATA_ROOT = BASE_DIR / "data"
+MODELS_DIR = BASE_DIR / "models"
 OUTPUTS_ROOT = BASE_DIR / "outputs"
 STUDIO_RUNS_ROOT = OUTPUTS_ROOT / "studio_runs"
-PREOPERATIVE_CONFIG_PATH = CONFIG_DIR / "preoperative.json"
+TUNING_CACHE_ROOT = OUTPUTS_ROOT / "tuning_cache"
+SEARCH_SPACE_PATH = CONFIG_DIR / "grid_search.json"
+DATASET_SUFFIXES = {".xlsx", ".xls", ".csv"}
 EXPORT_DPI = 150
 TRAINING_IMPORT_CHECK = "import joblib, numpy, openpyxl, pandas, sklearn, tqdm"
 
@@ -136,23 +149,6 @@ def resolve_training_python() -> tuple[str | None, str | None]:
     return None, "No usable Python interpreter found for training."
 
 
-def build_training_plan(targets: list[str], models: list[str]) -> tuple[list[dict[str, Any]], int]:
-    plan: list[dict[str, Any]] = []
-    total_units = 0
-    for target in targets:
-        best_params = best_parameters_for_target(target)
-        target_models = [m for m in models if isinstance(best_params.get(m), dict)]
-        plan.append(
-            {
-                "target": target,
-                "models": target_models,
-                "model_params": {m: best_params[m] for m in target_models},
-            }
-        )
-        total_units += len(target_models)
-    return plan, total_units
-
-
 def get_launch_job(job_id: str) -> dict[str, Any] | None:
     with LAUNCH_JOBS_LOCK:
         job = LAUNCH_JOBS.get(job_id)
@@ -178,80 +174,137 @@ def update_launch_execution_row(
     return execution_rows
 
 
+def target_folder(target: str) -> str:
+    """Folder name for a target; characters a path can't hold become '_', as in 'Complications (Y_N)'."""
+    return re.sub(r'[\\/:*?"<>|]', "_", target)
+
+
 def slugify(value: str) -> str:
     slug = re.sub(r"[^a-zA-Z0-9]+", "-", value.strip().lower()).strip("-")
     return slug or "run"
 
 
-def feature_group(feature: str) -> str:
-    if feature.startswith("Comorbidities_"):
-        return "Comorbidities"
-    if feature.startswith("Symptoms_"):
-        return "Presentation"
-    if feature.startswith("Radio_") or feature.startswith("Optic") or feature.startswith("ICA/"):
-        return "Imaging & Anatomy"
-    if "KPS" in feature or feature in {"ASA", "Charlson Comorbidity Index"}:
-        return "Functional Status"
-    if feature in {"Age", "Sex", "Date of surgery", "Date of Birth"}:
-        return "Demographics & Timing"
-    return "Clinical Core"
-
-
-def available_targets() -> list[str]:
-    if not GRIDSEARCH_ROOT.exists():
+def list_datasets() -> list[str]:
+    if not DATA_ROOT.exists():
         return []
-    return sorted([
-        child.name for child in GRIDSEARCH_ROOT.iterdir()
-        if child.is_dir() and (child / "best_parameters.json").exists()
-    ])
+    return sorted(p.name for p in DATA_ROOT.iterdir()
+                  if p.is_file() and p.suffix.lower() in DATASET_SUFFIXES)
 
 
-def best_parameters_for_target(target: str) -> dict[str, Any]:
-    return load_json(GRIDSEARCH_ROOT / target / "best_parameters.json")
+def dataset_path(name: str) -> Path:
+    if name not in list_datasets():
+        raise ValueError(f"Unknown dataset: {name}")
+    return DATA_ROOT / name
 
 
-def available_models_for_target(target: str) -> list[str]:
-    params = best_parameters_for_target(target)
-    return sorted([k for k, v in params.items() if isinstance(v, dict)])
+def read_table(path: Path) -> pd.DataFrame:
+    if path.suffix.lower() in {".xlsx", ".xls"}:
+        return pd.read_excel(path)
+    try:
+        return pd.read_csv(path, encoding="utf-8")
+    except UnicodeDecodeError:
+        return pd.read_csv(path, encoding="latin1")
 
 
-def model_union_for_targets(targets: list[str]) -> list[str]:
-    union: set[str] = set()
-    for t in targets:
-        union.update(available_models_for_target(t))
-    return sorted(union)
+def file_digest(path: Path) -> str:
+    return hashlib.sha1(path.read_bytes()).hexdigest()[:16]
 
 
-def apply_preset(preset_name: str, all_features: list[str]) -> list[str]:
-    if preset_name == "all":
-        return list(all_features)
-    if preset_name == "clear":
-        return []
-    if preset_name == "clinical":
-        keep = {"Demographics & Timing", "Comorbidities", "Presentation", "Functional Status", "Clinical Core"}
-        return [f for f in all_features if feature_group(f) in keep]
-    if preset_name == "imaging":
-        keep = {"Imaging & Anatomy", "Functional Status"}
-        return [f for f in all_features if feature_group(f) in keep]
-    if preset_name == "compact":
-        compact = {
-            "Age", "Sex", "Pre-Op KPS", "ASA", "Charlson Comorbidity Index",
-            "Radio_Pre-Op max_axial_diam_mm", "Radio_Tumor Location", "Radio_Tumor side", "Radio_Edema",
-        }
-        return [f for f in all_features if f in compact]
-    return list(all_features)
+def column_type(s: pd.Series) -> str:
+    """Guess one of numeric, binary, categorical or date for a column."""
+    if pd.api.types.is_datetime64_any_dtype(s):
+        return "date"
+    if pd.api.types.is_bool_dtype(s):
+        return "binary"
+    if pd.api.types.is_numeric_dtype(s):
+        return "binary" if set(s.dropna().unique()) <= {0, 1} else "numeric"
+    values = s.dropna().astype(str)
+    if len(values) and pd.to_datetime(values, errors="coerce", format="mixed").notna().mean() > 0.9:
+        return "date"
+    return "categorical"
 
 
-def build_subset_config(data_config: dict[str, Any], selected_features: list[str]) -> dict[str, Any]:
-    selected_set = set(selected_features)
-    ordered = [f for f in data_config.get("input_features", []) if f in selected_set]
+def dataset_profile(name: str) -> dict[str, Any]:
+    df = read_table(dataset_path(name))
+    columns = []
+    for col, s in df.items():
+        kind = column_type(s)
+        columns.append({
+            "name": str(col),
+            "type": kind,
+            "missing": int(s.isna().sum()),
+            # A column unique on every row is an identifier, not a predictor.
+            "id_like": kind in {"numeric", "categorical"} and s.nunique() == len(df),
+        })
+    return {"dataset": name, "rows": len(df), "columns": columns}
+
+
+def default_search_space() -> dict[str, Any]:
+    # ridge is regression-only and every studio target is binary.
+    return {k: v for k, v in load_json(SEARCH_SPACE_PATH).items() if k != "ridge"}
+
+
+def run_settings(run_root: Path) -> dict[str, Any]:
+    """The launch settings of a run: the saved studio settings, else rebuilt from metadata.json."""
+    saved = load_json_loose(run_root / "_runtime" / "studio_settings.json")
+    if saved:
+        return saved
+    metas = [load_json(p) for p in sorted(run_root.glob("*/metadata.json"))]
+    if not metas:
+        raise ValueError("This run has no metadata.json.")
+    first = metas[0]
+    data = first.get("data_configuration", {})
+    split = first.get("split_config", {})
+    policy = first.get("binary_decision_policy", {})
     return {
-        "input_file": data_config.get("input_file"),
-        "input_features": ordered,
-        "cols_string": [f for f in data_config.get("cols_string", []) if f in selected_set],
-        "cols_date": [f for f in data_config.get("cols_date", []) if f in selected_set],
-        "cols_multi": [f for f in data_config.get("cols_multi", []) if f in selected_set],
+        "dataset": Path(data.get("input_file", "")).name,
+        "targets": [m.get("target_column") for m in metas],
+        "models": sorted({m for meta in metas for m in meta.get("models_trained", [])}),
+        "selected_features": data.get("input_features", []),
+        "cols_string": data.get("cols_string", []),
+        "cols_date": data.get("cols_date", []),
+        "cols_multi": data.get("cols_multi", []),
+        "split_strategy": first.get("split_strategy", "temporal"),
+        "test_size": split.get("test_size") or 0.2,
+        "split_column": split.get("split_column") or "Split",
+        "date_column": split.get("date_column") or "Date of surgery",
+        "threshold_val_size": policy.get("threshold_val_size") or 0.2,
+        "min_recall": policy.get("min_recall") or 0.9,
+        "f_beta": policy.get("f_beta") or 2.0,
+        "fn_cost": policy.get("fn_cost") or 5.0,
+        "fp_cost": policy.get("fp_cost") or 1.0,
     }
+
+
+TUNING_KEY_FIELDS = (
+    "dataset_digest", "selected_features", "cols_string", "cols_date", "cols_multi",
+    "date_column", "test_size", "threshold_val_size", "min_recall", "f_beta", "fn_cost", "fp_cost",
+)
+
+
+def tuning_cache_path(settings: dict[str, Any], target: str, model: str, grid: Any) -> Path:
+    """Cache file for one model's tuned parameters; any change to data, features, grid or policy gives a new file."""
+    basis = {k: settings[k] for k in TUNING_KEY_FIELDS}
+    basis.update(target=target, model=model, grid=grid)
+    key = hashlib.sha1(json.dumps(basis, sort_keys=True).encode()).hexdigest()[:16]
+    return TUNING_CACHE_ROOT / f"{key}.json"
+
+
+def build_training_plan(settings: dict[str, Any], search_space: dict[str, Any]) -> list[dict[str, Any]]:
+    plan = []
+    for target in settings["targets"]:
+        cached, to_tune = {}, []
+        for model in settings["models"]:
+            if model not in search_space:
+                continue
+            path = tuning_cache_path(settings, target, model, search_space[model])
+            hit = None if settings.get("force_retune") else load_json_loose(path)
+            if hit:
+                cached[model] = hit["params"]
+            else:
+                to_tune.append(model)
+        plan.append({"target": target, "cached": cached, "to_tune": to_tune})
+    return plan
 
 
 # ---------------------------------------------------------------------------
@@ -401,14 +454,10 @@ def build_importance_chart(aggregated: pd.DataFrame) -> str | None:
     return fig_to_b64(fig)
 
 
-def build_group_dist_chart(features: list[str]) -> str | None:
-    if not features:
+def build_group_dist_chart(counts: dict[str, int]) -> str | None:
+    if not counts:
         return None
-    dist = (
-        pd.Series([feature_group(f) for f in features])
-        .value_counts()
-        .sort_values(ascending=True)
-    )
+    dist = pd.Series(counts).sort_values(ascending=True)
     fig, ax = _dark_fig(6.4, max(3.0, len(dist) * 0.55))
     ax.barh(dist.index, dist.values, color="#60a5fa", alpha=0.9)
     ax.set_title("Selected features by group", color="white", fontsize=13, pad=12)
@@ -427,7 +476,8 @@ def build_group_dist_chart(features: list[str]) -> str | None:
 
 def discover_runs() -> list[dict[str, Any]]:
     groups: dict[Path, set[str]] = {}
-    for metadata_path in OUTPUTS_ROOT.rglob("metadata.json"):
+    metadata_paths = [*OUTPUTS_ROOT.rglob("metadata.json"), *MODELS_DIR.rglob("metadata.json")]
+    for metadata_path in metadata_paths:
         target_dir = metadata_path.parent
         summary_path = target_dir / "benchmark_summary.csv"
         if not summary_path.exists():
@@ -437,7 +487,7 @@ def discover_runs() -> list[dict[str, Any]]:
 
     runs = []
     for run_root, targets in groups.items():
-        if run_root == OUTPUTS_ROOT:
+        if run_root in {OUTPUTS_ROOT, MODELS_DIR}:
             continue
         rel_path = run_root.relative_to(BASE_DIR)
         updated_at = datetime.fromtimestamp(run_root.stat().st_mtime)
@@ -575,171 +625,166 @@ def get_run_results(run_root: Path) -> dict[str, Any]:
     return {"targets": results, "run_path": str(run_root)}
 
 
+def run_subprocess(
+    cmd: list[str], log_path: Path, progress_path: Path, on_progress
+) -> tuple[int, str]:
+    """Run one pipeline script, calling on_progress with its progress file until it exits."""
+    if progress_path.exists():
+        progress_path.unlink()
+    child_env = os.environ.copy()
+    child_env.setdefault("LOKY_MAX_CPU_COUNT", "1")
+    child_env.setdefault("PYTHONUNBUFFERED", "1")
+    child_env.setdefault("PYTHONUTF8", "1")
+    with open(log_path, "w", encoding="utf-8") as log_fh:
+        proc = subprocess.Popen(
+            cmd,
+            cwd=BASE_DIR,
+            stdout=log_fh,
+            stderr=subprocess.STDOUT,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            env=child_env,
+        )
+        while proc.poll() is None:
+            on_progress(load_json_loose(progress_path))
+            time.sleep(0.8)
+    return proc.returncode, log_path.read_text(encoding="utf-8", errors="replace").strip()
+
+
+def policy_args(settings: dict[str, Any]) -> list[str]:
+    return [
+        "--min_recall", str(settings["min_recall"]),
+        "--f_beta", str(settings["f_beta"]),
+        "--fn_cost", str(settings["fn_cost"]),
+        "--fp_cost", str(settings["fp_cost"]),
+    ]
+
+
 def run_training_job(
     job_id: str,
-    payload: dict[str, Any],
-    training_plan: list[dict[str, Any]],
+    settings: dict[str, Any],
+    plan: list[dict[str, Any]],
+    run_root: Path,
+    training_python: str,
+    total_units: int,
+    execution_rows: list[dict[str, Any]],
 ) -> None:
     try:
-        run_root = Path(payload["run_root"])
-        runtime_root = Path(payload["runtime_root"])
-        data_config_path = Path(payload["data_config_path"])
-        training_python = payload["training_python"]
-        total_units = int(payload["total_units"])
+        runtime_root = run_root / "_runtime"
+        data_config_path = runtime_root / "data_config.json"
+        search_space = settings["search_space"]
         completed_units = 0
-        completed_targets = 0
-        execution_rows = copy.deepcopy(payload["execution"])
 
-        update_launch_job(
-            job_id,
-            status="running",
-            started_at=utc_now_iso(),
-            current_step="Preparing training runtime...",
-        )
+        update_launch_job(job_id, status="running", started_at=utc_now_iso(),
+                          current_step="Preparing training runtime...")
 
-        for item in training_plan:
-            target = item["target"]
-            target_models = item["models"]
-            target_output_dir = run_root / target
-
-            if not target_models:
-                execution_rows = update_launch_execution_row(
-                    execution_rows,
-                    target,
-                    status="skipped",
-                    message="No saved best parameters for the selected models.",
-                )
-                completed_targets += 1
-                update_launch_job(
-                    job_id,
-                    execution=copy.deepcopy(execution_rows),
-                    completed_targets=completed_targets,
-                )
-                continue
-
-            model_config_path = runtime_root / f"{slugify(target)}-model-config.json"
-            save_json(model_config_path, item["model_params"])
-            log_path = runtime_root / f"{slugify(target)}.log"
-            progress_path = runtime_root / f"{slugify(target)}-progress.json"
-            if progress_path.exists():
-                progress_path.unlink()
-
-            execution_rows = update_launch_execution_row(
-                execution_rows,
-                target,
-                status="running",
-                message="Starting training...",
-            )
+        def report(target: str, units: int, progress: dict[str, Any], fallback: str) -> None:
+            step = progress.get("current_step") or fallback
+            update_launch_execution_row(execution_rows, target, status="running", message=step)
             update_launch_job(
                 job_id,
                 execution=copy.deepcopy(execution_rows),
                 current_target=target,
-                current_model=None,
-                current_step=f"Preparing {target}...",
+                current_model=progress.get("current_model"),
+                current_step=step,
+                completed_units=units,
+                progress_pct=round(100.0 * units / total_units, 1) if total_units else 100.0,
             )
 
-            cmd = [
-                training_python,
-                str(SRC_DIR / "train.py"),
-                "--target",
-                target,
-                "--data_config",
-                str(data_config_path),
-                "--model_config",
-                str(model_config_path),
-                "--models",
-                ",".join(target_models),
-                "--output_folder",
-                str(target_output_dir),
-                "--split_strategy",
-                payload["split_strategy"],
-                "--test_size",
-                str(payload["test_size"]),
-                "--split_column",
-                payload["split_column"],
-                "--date_column",
-                payload["date_column"],
-                "--feature_importance",
-                "--threshold_val_size",
-                str(payload["threshold_val_size"]),
-                "--min_recall",
-                str(payload["min_recall"]),
-                "--f_beta",
-                str(payload["f_beta"]),
-                "--fn_cost",
-                str(payload["fn_cost"]),
-                "--fp_cost",
-                str(payload["fp_cost"]),
-                "--progress_path",
-                str(progress_path),
-            ]
-            child_env = os.environ.copy()
-            child_env.setdefault("LOKY_MAX_CPU_COUNT", "1")
-            child_env.setdefault("PYTHONUNBUFFERED", "1")
+        for i, item in enumerate(plan):
+            target = item["target"]
+            slug = slugify(target)
+            params = dict(item["cached"])
+            planned = len(item["cached"]) + len(item["to_tune"])
+            logs = []
 
-            with open(log_path, "w", encoding="utf-8") as log_fh:
-                proc = subprocess.Popen(
-                    cmd,
-                    cwd=BASE_DIR,
-                    stdout=log_fh,
-                    stderr=subprocess.STDOUT,
-                    text=True,
-                    encoding="utf-8",
-                    errors="replace",
-                    env=child_env,
+            if item["to_tune"]:
+                space_path = runtime_root / f"{slug}-search-space.json"
+                save_json(space_path, {m: search_space[m] for m in item["to_tune"]})
+                tuned_path = runtime_root / f"{slug}-tuned.json"
+                test_size = float(settings["test_size"])
+                cmd = [
+                    training_python, str(SRC_DIR / "tune.py"),
+                    "--target", target,
+                    "--data_config", str(data_config_path),
+                    "--search_space", str(space_path),
+                    "--output_file", str(tuned_path),
+                    "--date_column", settings["date_column"],
+                    "--test_size", str(test_size),
+                    # Same validation slice that train.py later uses to pick the threshold.
+                    "--val_size", str(float(settings["threshold_val_size"]) * (1 - test_size)),
+                    *policy_args(settings),
+                    "--progress_path", str(runtime_root / f"{slug}-tune-progress.json"),
+                ]
+                base = completed_units
+                rc, log = run_subprocess(
+                    cmd, runtime_root / f"{slug}-tune.log", runtime_root / f"{slug}-tune-progress.json",
+                    lambda p: report(target, base + int(p.get("completed_models", 0)), p, f"Tuning {target}..."),
                 )
+                logs.append(log)
+                completed_units += len(item["to_tune"])
+                tuned = load_json_loose(tuned_path)
+                selection = load_json_loose(tuned_path.with_name(f"{tuned_path.stem}_selection.json"))
+                for model in item["to_tune"]:
+                    if isinstance(tuned.get(model), dict):
+                        params[model] = tuned[model]
+                        save_json(
+                            tuning_cache_path(settings, target, model, search_space[model]),
+                            {"params": tuned[model], "selection": selection.get(model)},
+                        )
 
-                while True:
-                    rc = proc.poll()
-                    progress = load_json_loose(progress_path)
-                    target_completed_models = int(progress.get("completed_models", 0))
-                    current_model = progress.get("current_model")
-                    current_step = progress.get("current_step") or f"Training {target}..."
-                    message = progress.get("message") or current_step
-                    progress_pct = (
-                        round(100.0 * (completed_units + target_completed_models) / total_units, 1)
-                        if total_units
-                        else 100.0
-                    )
+            models = [m for m in settings["models"] if isinstance(params.get(m), dict)]
+            if not models:
+                completed_units += planned
+                update_launch_execution_row(
+                    execution_rows, target, status="failed", returncode=None,
+                    log="\n\n".join(logs)[-4000:],
+                    message="No model could be tuned. See console log.",
+                )
+                update_launch_job(job_id, execution=copy.deepcopy(execution_rows),
+                                  completed_units=completed_units, completed_targets=i + 1)
+                continue
 
-                    execution_rows = update_launch_execution_row(
-                        execution_rows,
-                        target,
-                        status="running",
-                        message=message,
-                    )
-                    update_launch_job(
-                        job_id,
-                        execution=copy.deepcopy(execution_rows),
-                        current_target=target,
-                        current_model=current_model,
-                        current_step=current_step,
-                        completed_units=completed_units + target_completed_models,
-                        progress_pct=progress_pct,
-                    )
-
-                    if rc is not None:
-                        break
-                    time.sleep(0.8)
-
-            combined_log = log_path.read_text(encoding="utf-8", errors="replace").strip()
-            completed_units += len(target_models)
-            completed_targets += 1
-            status = "ok" if proc.returncode == 0 else "failed"
-            execution_rows = update_launch_execution_row(
-                execution_rows,
-                target,
-                status=status,
-                returncode=proc.returncode,
-                log=combined_log[:4000],
-                message="" if proc.returncode == 0 else "Training subprocess failed. See console log.",
+            model_config_path = runtime_root / f"{slug}-model-config.json"
+            save_json(model_config_path, {m: params[m] for m in models})
+            cmd = [
+                training_python, str(SRC_DIR / "train.py"),
+                "--target", target,
+                "--data_config", str(data_config_path),
+                "--model_config", str(model_config_path),
+                "--models", ",".join(models),
+                "--output_folder", str(run_root / target_folder(target)),
+                "--split_strategy", settings["split_strategy"],
+                "--test_size", str(settings["test_size"]),
+                "--split_column", settings["split_column"],
+                "--date_column", settings["date_column"],
+                "--feature_importance",
+                "--threshold_val_size", str(settings["threshold_val_size"]),
+                *policy_args(settings),
+                "--progress_path", str(runtime_root / f"{slug}-progress.json"),
+            ]
+            base = completed_units
+            rc, log = run_subprocess(
+                cmd, runtime_root / f"{slug}.log", runtime_root / f"{slug}-progress.json",
+                lambda p: report(target, base + int(p.get("completed_models", 0)), p, f"Training {target}..."),
+            )
+            logs.append(log)
+            completed_units += planned
+            update_launch_execution_row(
+                execution_rows, target,
+                status="ok" if rc == 0 else "failed",
+                models=", ".join(models),
+                returncode=rc,
+                log="\n\n".join(logs)[-4000:],
+                message="" if rc == 0 else "Training subprocess failed. See console log.",
             )
             update_launch_job(
                 job_id,
                 execution=copy.deepcopy(execution_rows),
                 completed_units=completed_units,
-                completed_targets=completed_targets,
-                progress_pct=(round(100.0 * completed_units / total_units, 1) if total_units else 100.0),
+                completed_targets=i + 1,
+                progress_pct=round(100.0 * completed_units / total_units, 1) if total_units else 100.0,
             )
 
         run_results = None
@@ -758,7 +803,7 @@ def run_training_job(
             current_model=None,
             current_step="Training completed.",
             completed_units=total_units,
-            completed_targets=len(training_plan),
+            completed_targets=len(plan),
             progress_pct=100.0,
         )
     except Exception as exc:
@@ -782,152 +827,112 @@ def index():
 
 @app.route("/api/config")
 def get_config():
-    data_config = load_json(PREOPERATIVE_CONFIG_PATH)
-    all_features: list[str] = data_config.get("input_features", [])
-    targets = available_targets()
-    all_models = model_union_for_targets(targets)
-    groups = sorted({feature_group(f) for f in all_features})
-    group_map = {g: [f for f in all_features if feature_group(f) == g] for g in groups}
     return jsonify({
-        "all_features": all_features,
-        "targets": targets,
-        "all_models": all_models,
-        "groups": groups,
-        "group_map": group_map,
+        "datasets": list_datasets(),
+        "search_space": default_search_space(),
     })
 
 
-@app.route("/api/features/preset", methods=["POST"])
-def feature_preset():
-    data = request.get_json()
-    preset = data.get("preset", "all")
-    all_features: list[str] = data.get("all_features", [])
-    return jsonify({"features": apply_preset(preset, all_features)})
+@app.route("/api/datasets", methods=["POST"])
+def upload_dataset():
+    upload = request.files.get("file")
+    name = secure_filename(upload.filename or "") if upload else ""
+    if upload is None or Path(name).suffix.lower() not in DATASET_SUFFIXES:
+        return jsonify({"error": "Upload an .xlsx, .xls or .csv file."}), 400
+    DATA_ROOT.mkdir(exist_ok=True)
+    upload.save(DATA_ROOT / name)
+    return jsonify({"dataset": name, "datasets": list_datasets()})
 
 
-@app.route("/api/features/group-action", methods=["POST"])
-def feature_group_action():
-    data = request.get_json()
-    action = data.get("action", "add")
-    group_name = data.get("group", "")
-    all_features: list[str] = data.get("all_features", [])
-    selected: list[str] = data.get("selected", [])
-    group_features = [f for f in all_features if feature_group(f) == group_name]
+@app.route("/api/dataset/profile")
+def get_dataset_profile():
+    try:
+        return jsonify(dataset_profile(request.args.get("name", "")))
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 404
 
-    if action == "add":
-        seen: set[str] = set(selected)
-        new = list(selected)
-        for f in group_features:
-            if f not in seen:
-                new.append(f)
-    elif action == "remove":
-        gset = set(group_features)
-        new = [f for f in selected if f not in gset]
-    elif action == "only":
-        new = list(group_features)
-    else:
-        new = list(selected)
 
-    return jsonify({"features": new})
+@app.route("/api/run/settings")
+def get_run_settings():
+    try:
+        return jsonify(run_settings(Path(request.args.get("path", ""))))
+    except (ValueError, OSError) as exc:
+        return jsonify({"error": str(exc)}), 404
 
 
 @app.route("/api/chart/group-distribution", methods=["POST"])
 def group_distribution_chart():
     data = request.get_json()
-    features: list[str] = data.get("features", [])
-    img = build_group_dist_chart(features)
-    return jsonify({"image": img})
-
-
-@app.route("/api/models-for-targets", methods=["POST"])
-def models_for_targets():
-    data = request.get_json()
-    targets: list[str] = data.get("targets", [])
-    models = model_union_for_targets(targets)
-    availability = [
-        {
-            "target": t,
-            "available_models": ", ".join(available_models_for_target(t)) or "none",
-            "n_models": len(available_models_for_target(t)),
-        }
-        for t in targets
-    ]
-    return jsonify({"models": models, "availability": availability})
+    return jsonify({"image": build_group_dist_chart(data.get("counts", {}))})
 
 
 @app.route("/api/launch", methods=["POST"])
 def launch_training():
     data = request.get_json()
-    targets: list[str] = data.get("targets", [])
-    models: list[str] = data.get("models", [])
-    selected_features: list[str] = data.get("selected_features", [])
-    run_name: str = data.get("run_name", "")
-    split_strategy: str = data.get("split_strategy", "temporal")
-    test_size = float(data.get("test_size", 0.20))
-    threshold_val_size = float(data.get("threshold_val_size", 0.20))
-    min_recall = float(data.get("min_recall", 0.90))
-    f_beta = float(data.get("f_beta", 2.0))
-    fn_cost = float(data.get("fn_cost", 5.0))
-    fp_cost = float(data.get("fp_cost", 1.0))
-    split_column: str = data.get("split_column", "Split")
-    date_column: str = data.get("date_column", "Date of surgery")
+    settings: dict[str, Any] = {
+        "dataset": data.get("dataset", ""),
+        "targets": data.get("targets", []),
+        "models": data.get("models", []),
+        "selected_features": data.get("selected_features", []),
+        "cols_string": data.get("cols_string", []),
+        "cols_date": data.get("cols_date", []),
+        "cols_multi": data.get("cols_multi", []),
+        "run_name": data.get("run_name", ""),
+        "split_strategy": data.get("split_strategy", "temporal"),
+        "test_size": float(data.get("test_size", 0.20)),
+        "threshold_val_size": float(data.get("threshold_val_size", 0.20)),
+        "min_recall": float(data.get("min_recall", 0.90)),
+        "f_beta": float(data.get("f_beta", 2.0)),
+        "fn_cost": float(data.get("fn_cost", 5.0)),
+        "fp_cost": float(data.get("fp_cost", 1.0)),
+        "split_column": data.get("split_column", "Split"),
+        "date_column": data.get("date_column", "Date of surgery"),
+        "force_retune": bool(data.get("force_retune")),
+        "search_space": data.get("search_space") or default_search_space(),
+    }
+    try:
+        path = dataset_path(settings["dataset"])
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    settings["dataset_digest"] = file_digest(path)
+    features = set(settings["selected_features"])
+    for key in ("cols_string", "cols_date", "cols_multi"):
+        settings[key] = [c for c in settings[key] if c in features]
+
     training_python, training_error = resolve_training_python()
     if not training_python:
-        return jsonify({
-            "execution": [],
-            "run_path": "",
-            "run_results": None,
-            "error": training_error,
-        }), 500
+        return jsonify({"error": training_error}), 500
 
-    base_config = load_json(PREOPERATIVE_CONFIG_PATH)
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    label = slugify(run_name or "studio-run")
-    run_root = STUDIO_RUNS_ROOT / f"{timestamp}-{label}"
+    run_root = STUDIO_RUNS_ROOT / f"{timestamp}-{slugify(settings['run_name'] or 'studio-run')}"
     runtime_root = run_root / "_runtime"
     runtime_root.mkdir(parents=True, exist_ok=True)
+    save_json(runtime_root / "studio_settings.json", settings)
+    save_json(runtime_root / "data_config.json", {
+        "input_file": str(path),
+        "input_features": settings["selected_features"],
+        "cols_string": settings["cols_string"],
+        "cols_date": settings["cols_date"],
+        "cols_multi": settings["cols_multi"],
+    })
 
-    subset_config = build_subset_config(base_config, selected_features)
-    data_config_path = runtime_root / "data_config.json"
-    save_json(data_config_path, subset_config)
-    training_plan, total_units = build_training_plan(targets, models)
-    execution_rows: list[dict[str, Any]] = []
-    for item in training_plan:
-        target_models = item["models"]
-        execution_rows.append(
-            {
-                "target": item["target"],
-                "status": "queued" if target_models else "skipped",
-                "models": ", ".join(target_models),
-                "returncode": None,
-                "log": "",
-                "output_dir": str(run_root / item["target"]),
-                "message": (
-                    "Queued for training..."
-                    if target_models
-                    else "No saved best parameters for the selected models."
-                ),
-            }
-        )
+    plan = build_training_plan(settings, settings["search_space"])
+    total_units = sum(2 * len(i["to_tune"]) + len(i["cached"]) for i in plan)
+    execution_rows = [
+        {
+            "target": item["target"],
+            "status": "queued",
+            "models": ", ".join(settings["models"]),
+            "tuning": f"{len(item['cached'])} reused, {len(item['to_tune'])} to tune",
+            "returncode": None,
+            "log": "",
+            "output_dir": str(run_root / target_folder(item["target"])),
+            "message": "Queued...",
+        }
+        for item in plan
+    ]
 
     job_id = uuid.uuid4().hex
-    job_payload = {
-        "run_root": str(run_root),
-        "runtime_root": str(runtime_root),
-        "data_config_path": str(data_config_path),
-        "training_python": training_python,
-        "split_strategy": split_strategy,
-        "test_size": test_size,
-        "threshold_val_size": threshold_val_size,
-        "min_recall": min_recall,
-        "f_beta": f_beta,
-        "fn_cost": fn_cost,
-        "fp_cost": fp_cost,
-        "split_column": split_column,
-        "date_column": date_column,
-        "total_units": total_units,
-        "execution": copy.deepcopy(execution_rows),
-    }
     job = {
         "job_id": job_id,
         "status": "queued",
@@ -938,12 +943,12 @@ def launch_training():
         "run_path": str(run_root),
         "run_results": None,
         "python_executable": training_python,
-        "execution": copy.deepcopy(execution_rows),
+        "execution": execution_rows,
         "progress_pct": 0.0,
         "completed_units": 0,
         "total_units": total_units,
         "completed_targets": 0,
-        "total_targets": len(training_plan),
+        "total_targets": len(plan),
         "current_target": None,
         "current_model": None,
         "current_step": "Queued for training...",
@@ -952,12 +957,11 @@ def launch_training():
     with LAUNCH_JOBS_LOCK:
         LAUNCH_JOBS[job_id] = job
 
-    thread = threading.Thread(
+    threading.Thread(
         target=run_training_job,
-        args=(job_id, job_payload, training_plan),
+        args=(job_id, settings, plan, run_root, training_python, total_units, copy.deepcopy(execution_rows)),
         daemon=True,
-    )
-    thread.start()
+    ).start()
     return jsonify(get_launch_job(job_id)), 202
 
 
