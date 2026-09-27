@@ -14,7 +14,12 @@ from sklearn.ensemble import (
 )
 from sklearn.impute import SimpleImputer
 from sklearn.linear_model import LogisticRegression, Ridge
-from sklearn.metrics import confusion_matrix, f1_score, mean_squared_error, roc_auc_score
+from sklearn.metrics import (
+    confusion_matrix,
+    f1_score,
+    mean_squared_error,
+    roc_auc_score,
+)
 from sklearn.model_selection import ParameterGrid
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
