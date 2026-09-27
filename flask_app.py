@@ -168,6 +168,38 @@ def update_launch_job(job_id: str, **updates: Any) -> None:
             return
         job.update(updates)
         job["updated_at"] = utc_now_iso()
+        save_json(Path(job["run_path"]) / "_runtime" / "job.json", job)
+
+
+JOB_DONE = {"completed", "failed", "interrupted"}
+RETRY_ADVICE = ("Start the run again with the same settings (Launchpad, Load settings from a previous run): "
+                "tuned parameters are cached, so tuning is skipped.")
+
+
+def latest_launch_job() -> dict[str, Any]:
+    """The newest job, from memory or from disk; one the studio was closed on becomes 'interrupted'."""
+    with LAUNCH_JOBS_LOCK:
+        if LAUNCH_JOBS:
+            return copy.deepcopy(list(LAUNCH_JOBS.values())[-1])
+    saved = sorted(STUDIO_RUNS_ROOT.glob("*/_runtime/job.json"))
+    job = load_json_loose(saved[-1]) if saved else {}
+    if job and job.get("status") not in JOB_DONE:
+        job.update(status="interrupted", current_target=None, current_model=None,
+                   current_step=f"The studio was closed during {job.get('current_target') or 'the run'} "
+                                f"({job.get('current_step') or 'training'})",
+                   error=f"The studio was closed before the run finished. {RETRY_ADVICE}")
+        for row in job.get("execution", []):
+            if row.get("status") in ("queued", "running"):
+                row.update(status="interrupted", message="Stopped when the studio was closed.")
+    return job
+
+
+def explain_failure(returncode: int | None, log: str) -> str:
+    """What stopped a training script, in plain words, with what to do."""
+    if returncode is not None and returncode < 0:
+        return ("The training process was stopped by the system, usually when the computer went to sleep "
+                "or ran out of memory. " + RETRY_ADVICE)
+    return failure_reason(log) + " " + RETRY_ADVICE
 
 
 def update_launch_execution_row(
@@ -385,8 +417,8 @@ def failure_reason(log: str) -> str:
     lines = [line.strip() for line in log.splitlines() if line.strip()]
     for line in reversed(lines):
         if "Error" in line or "Failed" in line:
-            return line[-300:]
-    return lines[-1][-300:] if lines else "The script stopped without output."
+            return line[:300]
+    return lines[-1][:300] if lines else "The script stopped without output."
 
 
 FREEZE_FILES = ("pipeline.joblib", "decision_policy.json", "metrics.json")
@@ -859,7 +891,7 @@ def run_training_job(
                 update_launch_execution_row(
                     execution_rows, target, status="failed", returncode=None,
                     log="\n\n".join(logs)[-4000:],
-                    message="No model could be tuned: " + failure_reason("\n".join(logs)),
+                    message="No model could be tuned. " + explain_failure(None, "\n".join(logs)),
                 )
                 update_launch_job(job_id, execution=copy.deepcopy(execution_rows),
                                   completed_units=completed_units, completed_targets=i + 1)
@@ -893,7 +925,7 @@ def run_training_job(
             # train.py logs a model that fails and carries on with the rest.
             model_failures = [line.split(" - ")[-1].strip() for line in log.splitlines() if "Failed to train" in line]
             if rc != 0:
-                message = "Failed: " + failure_reason(log)
+                message = explain_failure(rc, log)
             else:
                 message = "; ".join(model_failures)
             update_launch_execution_row(
@@ -936,7 +968,7 @@ def run_training_job(
             job_id,
             status="failed",
             finished_at=utc_now_iso(),
-            error=str(exc),
+            error=f"The studio hit an error it did not expect: {exc}. {RETRY_ADVICE}",
             current_step="Training failed.",
         )
 
@@ -1031,6 +1063,10 @@ def launch_training():
     if problems:
         return jsonify({"error": "Fix these before training.", "problems": problems}), 400
 
+    running = latest_launch_job()
+    if running and running["status"] not in JOB_DONE:
+        return jsonify({"error": f"A run is already going in {running['run_path']}. Wait for it to finish."}), 409
+
     training_python, training_error = resolve_training_python()
     if not training_python:
         return jsonify({"error": training_error}), 500
@@ -1101,7 +1137,7 @@ def launch_training():
 def launch_training_status():
     job_id = request.args.get("job_id", "").strip()
     if not job_id:
-        return jsonify({"error": "No job id provided"}), 400
+        return jsonify(latest_launch_job())
     job = get_launch_job(job_id)
     if not job:
         return jsonify({"error": "Training job not found"}), 404

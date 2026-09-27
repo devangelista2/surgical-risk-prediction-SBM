@@ -842,7 +842,21 @@ async function boot() {
     renderDatasetSel();
     if (S.datasets.length) await selectDataset(S.datasets[0]);
     else renderAll();
+    showLatestJob();
   } catch(e) { toast('Config load failed: ' + e.message, 'err'); }
+}
+
+const JOB_DONE = ['completed', 'failed', 'interrupted'];
+
+/* The last run, also after a reload or a restart of the studio: still going, or how it ended. */
+async function showLatestJob() {
+  let job;
+  try { job = await api('/api/launch/status'); } catch (e) { return; }
+  if (!job.job_id) return;
+  S.activeLaunchJob = job;
+  renderLaunchProgress(job);
+  if (JOB_DONE.includes(job.status)) renderLaunchOut(job);
+  else startLaunchPolling(job.job_id);
 }
 
 function renderAll() {
@@ -1069,7 +1083,7 @@ function updateSnapshot() {
   setText('sn-f', n);
   setText('sn-r', tot>0 ? Math.round(100*(1-n/tot))+'%' : '0%');
   setText('sn-g', new Set(S.selFeatures.map(fGroup)).size);
-  const launchBusy = !!S.activeLaunchJob && !['completed','failed'].includes(S.activeLaunchJob.status);
+  const launchBusy = !!S.activeLaunchJob && !JOB_DONE.includes(S.activeLaunchJob.status);
   document.getElementById('launchBtn').disabled =
     !S.dataset || !S.selTargets.length || !S.selModels.length || !n || launchBusy;
 }
@@ -1281,7 +1295,7 @@ async function launchTraining() {
   if (!S.selTargets.length)  { toast('Select at least one target.',  'err'); return; }
   if (!S.selModels.length)   { toast('Select at least one model.',   'err'); return; }
   if (!S.selFeatures.length) { toast('Select at least one feature.', 'err'); return; }
-  if (S.activeLaunchJob && !['completed','failed'].includes(S.activeLaunchJob.status)) {
+  if (S.activeLaunchJob && !JOB_DONE.includes(S.activeLaunchJob.status)) {
     toast('A training job is already running.', 'err'); return;
   }
   const settings = collectSettings();
@@ -1320,34 +1334,33 @@ function stopLaunchPolling() {
 }
 
 async function pollLaunchJob(jobId) {
+  let delay = 1000;
   try {
     const job = await api('/api/launch/status?job_id=' + encodeURIComponent(jobId));
     S.activeLaunchJob = job;
     updateSnapshot();
     renderLaunchProgress(job);
-
-    if (job.status === 'completed' || job.status === 'failed') {
+    if (JOB_DONE.includes(job.status)) {
       stopLaunchPolling();
       if (job.status === 'completed') {
-        const ok = job.execution.filter(r=>r.status==='ok').length;
         const fl = job.execution.filter(r=>r.status==='failed').length;
-        toast(fl ? `Training done — ${fl} failed.` : `Training done — ${ok} succeeded.`, fl?'err':'ok');
-        renderLaunchOut(job);
+        toast(fl ? `Training done — ${fl} failed.` : 'Training done.', fl?'err':'ok');
         refreshRuns();
-      } else {
-        toast('Training failed: ' + (job.error || 'unknown error'), 'err');
-        if (job.execution?.length) renderLaunchOut(job);
-      }
+      } else toast(job.error || 'Training failed.', 'err');
+      renderLaunchOut(job);
       return;
     }
   } catch (e) {
-    stopLaunchPolling();
-    toast('Progress polling failed: ' + e.message, 'err');
-    return;
+    if (/not found/i.test(e.message)) { stopLaunchPolling(); showLatestJob(); return; }
+    // The studio may be asleep with the laptop; keep asking rather than give up.
+    document.querySelector('.launch-progress-sub')?.replaceChildren(
+      'Cannot reach the studio. Is its terminal window still open? Still trying...');
+    delay = 3000;
   }
 
-  S.launchPollTimer = setTimeout(() => pollLaunchJob(jobId), 1000);
+  S.launchPollTimer = setTimeout(() => pollLaunchJob(jobId), delay);
 }
+
 
 function renderLaunchProgress(job) {
   const el = document.getElementById('launchProgress');
@@ -1415,8 +1428,9 @@ function renderLaunchProgress(job) {
 function renderLaunchOut(res) {
   let h = `<div class="sh"><div class="sh-row"><span class="sh-title">Latest Run</span></div>
              <div class="sh-sub" style="font-family:'JetBrains Mono',monospace;font-size:.7rem">${esc(res.run_path)}</div>
-           </div>
-           <div class="tbl-wrap card mb1">${tbl(['target','status','models','returncode','message'],res.execution)}</div>`;
+           </div>`;
+  if (res.error) h += `<div class="hint mb1" style="border-color:rgba(248,113,113,.35)">${esc(res.error)}</div>`;
+  h += `<div class="tbl-wrap card mb1">${tbl(['target','status','models','returncode','message'],res.execution)}</div>`;
   const wl = res.execution.filter(r=>r.log);
   if (wl.length) {
     h += `<details style="margin-bottom:1rem"><summary>Console logs</summary>`;
@@ -1604,7 +1618,7 @@ function tbl(cols, rows) {
   rows.forEach(row => {
     h += '<tr>' + cs.map(c => {
       const v=row[c], vs=v===null||v===undefined?'—':String(v);
-      const cl = v==='ok'?'v-ok': v==='failed'?'v-fail': v==='skipped'?'v-skip':
+      const cl = v==='ok'?'v-ok': (v==='failed'||v==='interrupted')?'v-fail': v==='skipped'?'v-skip':
         (typeof v==='number'||(typeof v==='string'&&/^\d+\.?\d*$/.test(vs.trim())))?'v-num':'';
       return `<td class="${cl}">${esc(vs)}</td>`;
     }).join('') + '</tr>';

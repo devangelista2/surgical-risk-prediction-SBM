@@ -72,6 +72,16 @@ This script now enables `--feature_importance` by default, so each trained model
 
 The outputs are written under `outputs/preoperative_from_gridsearch/<target>/<model>/`.
 
+## 🖥️ Training studio
+
+```bash
+python flask_app.py      # http://localhost:5000/
+```
+
+A training run keeps going when the browser tab closes; reopening the page shows it. If the studio
+process is closed mid-run, the page says so on the next start, and starting the run again with
+the same settings skips the tuning already done.
+
 ## 🧠 Inference (Loading Saved Weights)
 
 The script automatically saves the entire trained pipeline (imputers, scalers, encoders, and the model itself) as `pipeline.joblib`. 
