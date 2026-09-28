@@ -326,7 +326,8 @@ def run_settings(run_root: Path) -> dict[str, Any]:
 
 TUNING_KEY_FIELDS = (
     "dataset_digest", "selected_features", "cols_string", "cols_date", "cols_multi",
-    "date_column", "test_size", "threshold_val_size", "min_recall", "f_beta", "fn_cost", "fp_cost",
+    "split_strategy", "split_column", "date_column", "test_size", "threshold_val_size",
+    "min_recall", "f_beta", "fn_cost", "fp_cost",
 )
 
 
@@ -365,10 +366,12 @@ def preflight(settings: dict[str, Any], df: pd.DataFrame) -> list[str]:
     problems = []
     date_col = settings["date_column"]
     dates = None
-    if date_col not in df.columns:
-        problems.append(f"Date column '{date_col}' is not in the dataset. Tuning sorts patients by it; "
-                        "set the right column under Advanced training settings.")
-    else:
+    temporal = settings["split_strategy"] == "temporal"
+    if temporal and date_col not in df.columns:
+        problems.append((f"Date column '{date_col}' is not in the dataset" if date_col else "No date column is set")
+                        + ". A temporal split sorts patients by it; set the right column, or pick a Random split, "
+                        "under Advanced training settings.")
+    elif temporal:
         dates = pd.Series(pd.to_datetime(df[date_col].astype(str), errors="coerce", format="mixed"), index=df.index)
         if dates.notna().mean() < 0.5:
             problems.append(f"Date column '{date_col}' has too few readable dates.")
@@ -855,16 +858,21 @@ def run_training_job(
                 save_json(space_path, {m: search_space[m] for m in item["to_tune"]})
                 tuned_path = runtime_root / f"{slug}-tuned.json"
                 test_size = float(settings["test_size"])
+                val_size = float(settings["threshold_val_size"])
+                if settings["split_strategy"] == "temporal":
+                    val_size *= 1 - test_size
                 cmd = [
                     training_python, str(SRC_DIR / "tune.py"),
                     "--target", target,
                     "--data_config", str(data_config_path),
                     "--search_space", str(space_path),
                     "--output_file", str(tuned_path),
+                    "--split_strategy", settings["split_strategy"],
+                    "--split_column", settings["split_column"],
                     "--date_column", settings["date_column"],
                     "--test_size", str(test_size),
                     # Same validation slice that train.py later uses to pick the threshold.
-                    "--val_size", str(float(settings["threshold_val_size"]) * (1 - test_size)),
+                    "--val_size", str(val_size),
                     *policy_args(settings),
                     "--progress_path", str(runtime_root / f"{slug}-tune-progress.json"),
                 ]

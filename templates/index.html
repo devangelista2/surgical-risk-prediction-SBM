@@ -666,7 +666,7 @@ textarea:focus { border-color: rgba(34,211,238,.38); }
       </div>
       <div style="grid-column:1/-1">
         <label class="chk"><input type="checkbox" id="forceRetune" /> Re-tune even when saved tuning matches</label>
-        <div class="sc-cap">Tuning always uses the temporal split on the date column.</div>
+        <div class="sc-cap">Tuning splits the data the same way as training.</div>
       </div>
       <div style="grid-column:1/-1">
         <label class="fl">Search grid (JSON)</label>
@@ -957,8 +957,11 @@ async function selectDataset(name) {
     S.selTargets = [];
     S.allFeatures = p.columns.map(c => c.name);
     S.selFeatures = defaultFeatures();
-    const dateCol = p.columns.find(c => c.type === 'date');
-    if (dateCol) document.getElementById('dateColumn').value = dateCol.name;
+    const dates = p.columns.filter(c => c.type === 'date').map(c => c.name);
+    const dateCol = dates.find(n => /surgery/i.test(n)) || dates.find(n => !/birth/i.test(n)) || '';
+    document.getElementById('dateColumn').value = dateCol;
+    document.querySelector('#splitStrategy option[value="temporal"]').disabled = !dateCol;
+    if (!dateCol) document.getElementById('splitStrategy').value = 'random';
     document.getElementById('columnList').innerHTML =
       S.allFeatures.map(f => `<option value="${esc(f)}"></option>`).join('');
     if (!S.runNameEdited) {
