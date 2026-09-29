@@ -465,7 +465,7 @@ def freeze_run(run_root: Path, picks: dict[str, str], high_pct: float, name: str
             "high": round(float(np.percentile(probs, high_pct)), 3),
         }
         data = load_json(run_root / target / "metadata.json").get("data_configuration", {})
-        if model.startswith("torch") or data.get("cols_date") or data.get("cols_multi"):
+        if data.get("cols_date") or data.get("cols_multi"):
             warnings.append(f"{target}: {model} needs this repo's src/ to load, so neurosurg-predict cannot load it.")
     for target, model in picks.items():
         (out / target / model).mkdir(parents=True)
