@@ -518,10 +518,11 @@ def format_metric_value(metric_name: str, value: Any) -> str:
     return f"{float(value):.3f}"
 
 
-def _dark_fig(w: float, h: float):
+def _light_fig(w: float, h: float):
     fig, ax = plt.subplots(figsize=(w, h))
-    fig.patch.set_facecolor("#08111f")
-    ax.set_facecolor("#0d1727")
+    fig.patch.set_facecolor("white")
+    ax.set_facecolor("white")
+    ax.set_axisbelow(True)
     return fig, ax
 
 
@@ -535,21 +536,15 @@ def build_bar_chart(summary_df: pd.DataFrame, task_type: str) -> tuple[str | Non
         return None, metric
     ascending = metric in {"rmse", "mae"}
     df = df.sort_values(metric, ascending=ascending)
-    sns.set_theme(style="dark")
-    fig, ax = _dark_fig(7.5, 4.2)
-    palette = ["#5eead4", "#60a5fa", "#38bdf8", "#f59e0b", "#f472b6", "#c084fc"]
-    sns.barplot(data=df, x=metric, y="model", hue="model", dodge=False,
-                palette=palette[:len(df)], ax=ax)
-    legend = ax.get_legend()
-    if legend is not None:
-        legend.remove()
-    ax.set_title(f"Model comparison — {metric}", color="white", fontsize=13, pad=12)
-    ax.set_xlabel(metric, color="#dbeafe")
+    fig, ax = _light_fig(7.5, 4.2)
+    sns.barplot(data=df, x=metric, y="model", color="#1d4ed8", ax=ax)
+    ax.set_title(f"Model comparison — {metric}", color="#0f172a", fontsize=13, pad=12)
+    ax.set_xlabel(metric, color="#334155")
     ax.set_ylabel("")
-    ax.tick_params(colors="#dbeafe")
+    ax.tick_params(colors="#334155")
     for spine in ax.spines.values():
-        spine.set_color("#1f314f")
-    ax.grid(axis="x", color="#24364f", alpha=0.4)
+        spine.set_color("#cbd5e1")
+    ax.grid(axis="x", color="#e2e8f0")
     fig.tight_layout()
     return fig_to_b64(fig), metric
 
@@ -569,12 +564,12 @@ def build_heatmap_chart(summary_df: pd.DataFrame, task_type: str) -> str | None:
     if df.empty:
         return None
     df = df.set_index("model")
-    fig, ax = _dark_fig(max(6, len(metrics) * 1.1), max(2.5, len(df) * 0.65))
+    fig, ax = _light_fig(max(6, len(metrics) * 1.1), max(2.5, len(df) * 0.65))
     sns.heatmap(df, annot=True, fmt=".3f",
-                cmap=sns.color_palette(["#0f172a", "#1d4ed8", "#2dd4bf"], as_cmap=True),
-                linewidths=0.6, linecolor="#14233b", cbar=False, ax=ax)
-    ax.set_title("Metric matrix", color="white", fontsize=13, pad=12)
-    ax.tick_params(colors="#dbeafe", labelrotation=0)
+                cmap=sns.color_palette(["#eff6ff", "#93c5fd", "#1d4ed8"], as_cmap=True),
+                linewidths=0.6, linecolor="white", cbar=False, ax=ax)
+    ax.set_title("Metric matrix", color="#0f172a", fontsize=13, pad=12)
+    ax.tick_params(colors="#334155", labelrotation=0)
     fig.tight_layout()
     return fig_to_b64(fig)
 
@@ -610,15 +605,15 @@ def build_importance_chart(aggregated: pd.DataFrame) -> str | None:
     if aggregated.empty:
         return None
     top = aggregated.head(15).sort_values("mean_abs_importance", ascending=True)
-    fig, ax = _dark_fig(8, max(4.2, len(top) * 0.35))
+    fig, ax = _light_fig(8, max(4.2, len(top) * 0.35))
     ax.barh(top["Feature"], top["mean_abs_importance"],
-            color="#5eead4", alpha=0.85, edgecolor="#99f6e4")
-    ax.set_title("Cross-model permutation importance", color="white", fontsize=13, pad=12)
-    ax.set_xlabel("Mean absolute importance", color="#dbeafe")
-    ax.tick_params(colors="#dbeafe")
+            color="#1d4ed8")
+    ax.set_title("Cross-model permutation importance", color="#0f172a", fontsize=13, pad=12)
+    ax.set_xlabel("Mean absolute importance", color="#334155")
+    ax.tick_params(colors="#334155")
     for spine in ax.spines.values():
-        spine.set_color("#1f314f")
-    ax.grid(axis="x", color="#24364f", alpha=0.35)
+        spine.set_color("#cbd5e1")
+    ax.grid(axis="x", color="#e2e8f0")
     fig.tight_layout()
     return fig_to_b64(fig)
 
@@ -627,14 +622,14 @@ def build_group_dist_chart(counts: dict[str, int]) -> str | None:
     if not counts:
         return None
     dist = pd.Series(counts).sort_values(ascending=True)
-    fig, ax = _dark_fig(6.4, max(3.0, len(dist) * 0.55))
-    ax.barh(dist.index, dist.values, color="#60a5fa", alpha=0.9)
-    ax.set_title("Selected features by group", color="white", fontsize=13, pad=12)
-    ax.tick_params(colors="#dbeafe")
-    ax.set_xlabel("Count", color="#dbeafe")
+    fig, ax = _light_fig(6.4, max(3.0, len(dist) * 0.55))
+    ax.barh(dist.index, dist.values, color="#1d4ed8")
+    ax.set_title("Selected features by group", color="#0f172a", fontsize=13, pad=12)
+    ax.tick_params(colors="#334155")
+    ax.set_xlabel("Count", color="#334155")
     for spine in ax.spines.values():
-        spine.set_color("#1f314f")
-    ax.grid(axis="x", color="#24364f", alpha=0.35)
+        spine.set_color("#cbd5e1")
+    ax.grid(axis="x", color="#e2e8f0")
     fig.tight_layout()
     return fig_to_b64(fig)
 
