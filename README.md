@@ -1,86 +1,59 @@
-# SBM Stratify Training Pipeline
+# SBM Stratify Training Studio
 
-A streamlined, robust, and highly configurable machine learning pipeline for medical tabular data. It handles both classification and regression automatically, supports complex temporal/predefined splitting strategies, trains Scikit-Learn and PyTorch models, and exports publication-ready scientific plots.
+A streamlined, robust, and highly configurable machine learning studio for medical tabular data. It handles both classification and regression automatically, supports temporal/predefined/random splitting strategies, tunes and trains Scikit-Learn and PyTorch models, and exports publication-ready scientific plots — all from a single web app.
 
 ## 📂 Project Structure
 
 ```text
 .
-├── train.py                  # Main training execution script
-├── preprocessing.py          # Custom scikit-learn transformers (dates, multilabel)
-├── utils/
-│   ├── logger.py             # Standardized terminal logging
-│   └── vis.py                # Publication-ready plotting utilities (matplotlib/seaborn)
-├── nn/
-│   ├── torch_mlp.py          # PyTorch Multi-Layer Perceptron
-│   └── torch_ft_transformer.py # PyTorch FT-Transformer
-├── experiments/
-│   └── train.sh              # Bash script for easy experiment configuration
-├── data_config.json          # Maps the dataset features and target
-└── parameters.json           # Defines hyperparameters for the models
+├── admin_panel.py            # The web app: upload data, tune, train, browse results, freeze models
+├── templates/index.html      # Studio front-end
+├── static/                   # Logo and assets
+├── src/
+│   ├── train.py              # Training script (spawned by the studio per target)
+│   ├── tune.py               # Grid-search tuning script
+│   ├── preprocessing.py      # Custom scikit-learn transformers (dates, multilabel)
+│   ├── nn/                   # PyTorch MLP and FT-Transformer
+│   └── utils/                # Logging and publication-ready plotting utilities
+├── configs/
+│   ├── grid_search_light.json    # Small grid — fastest tuning
+│   ├── grid_search_medium.json   # Balanced grid (default)
+│   └── grid_search_heavy.json    # Large grid — most thorough tuning
+├── data/                     # Datasets (.xlsx / .xls / .csv)
+└── outputs/                  # Studio runs, tuning cache, and frozen models
 ```
 
-## ⚙️ Configuration
-
-### 1. `data_config.json`
-Defines your dataset. Group your features appropriately so the pipeline knows how to scale and encode them.
-```json
-{
-    "input_file": "data/SBM1212.xlsx",
-    "input_features": ["Age", "Sex", "Pre-Op KPS", "Radio_Tumor side"],
-    "cols_string": ["Sex", "Radio_Tumor side"],
-    "cols_date": [],
-    "cols_multi": []
-}
-```
-
-### 2. `parameters.json`
-Define the hyperparameters for any model you wish to use (`hgb`, `rf`, `lr`, `ridge`, `svc`, `torch_mlp`, `torch_ft_transformer`).
-
-## 🚀 Usage
-
-You can run the script directly via python:
-```bash
-python train.py --target "Severe_complication" --split_strategy temporal --date_column "Date of surgery"
-```
-
-**Or use the provided bash script for easier experiment management:**
-```bash
-cd experiments
-./train.sh
-```
-
-### Train All Targets With Grid-Search Best Parameters
-
-Run the temporal grid search first. This writes one `best_parameters.json` file per target under `gridsearch/preoperative/`.
+## 🖥️ Running the studio
 
 ```bash
-bash experiments/grid_search.sh
+python admin_panel.py      # http://localhost:5000/
 ```
 
-Then train every available model for every configured target using those saved best parameters:
-
-```bash
-bash experiments/train_from_gridsearch.sh
-```
-
-This script now enables `--feature_importance` by default, so each trained model also writes:
-
-- `feature_importance.csv`
-- `feature_importance.png`
-- `feature_importance.pdf`
-
-The outputs are written under `outputs/preoperative_from_gridsearch/<target>/<model>/`.
-
-## 🖥️ Training studio
-
-```bash
-python flask_app.py      # http://localhost:5000/
-```
+From the browser you can upload a dataset, pick the outcomes, features and learners, adjust the
+advanced training settings, and launch training. Results are written under
+`outputs/studio_runs/` and can be browsed in the Results Explorer or frozen for deployment.
 
 A training run keeps going when the browser tab closes; reopening the page shows it. If the studio
 process is closed mid-run, the page says so on the next start, and starting the run again with
 the same settings skips the tuning already done.
+
+### Stopping a run
+
+While a run is going, the **Train Selected Configuration** button turns red and becomes a
+**Stop Training** button. Clicking it halts the current tuning/training subprocess and cancels
+the remaining targets. Any target that already finished is kept, and its tuning is cached —
+restarting with the same settings resumes from there.
+
+### Grid search intensity
+
+Under **Advanced training settings → Grid search intensity** you can choose how many
+hyper-parameter combinations tuning explores:
+
+- **Light** — fewer values, fastest, good for a quick pass.
+- **Medium** — balanced default.
+- **Heavy** — more values, slower but more precise.
+
+Picking a preset fills the *Search grid (JSON)* box, which you can still edit by hand to override it.
 
 ## 🧠 Inference (Loading Saved Weights)
 

@@ -215,6 +215,11 @@ body {
 .btn-cta:active { transform: translateY(0); }
 .btn-cta:disabled { opacity: .28; cursor: not-allowed; animation: none; transform: none !important; box-shadow: none !important; }
 .btn-cta:disabled::after { display: none; }
+.btn-cta.stop {
+  color: #fff; animation: none;
+  background: linear-gradient(130deg, #EF4444 0%, #DC2626 55%, #B91C1C 100%);
+}
+.btn-cta.stop:hover { box-shadow: 0 12px 40px rgba(239,68,68,.4); }
 
 .launch-progress {
   margin-top: 1rem;
@@ -669,6 +674,15 @@ textarea:focus { border-color: rgba(34,211,238,.38); }
         <div class="sc-cap">Tuning splits the data the same way as training.</div>
       </div>
       <div style="grid-column:1/-1">
+        <label class="fl">Grid search intensity</label>
+        <select id="gridPreset" onchange="applyGridPreset()">
+          <option value="light">Light — fastest, fewer parameters to test</option>
+          <option value="medium">Medium — balanced (default)</option>
+          <option value="heavy">Heavy — most thorough, slowest</option>
+        </select>
+        <div class="sc-cap">Light tries fewer hyper-parameter values so tuning finishes sooner; Heavy tries more for a more precise search. Editing the grid below overrides this.</div>
+      </div>
+      <div style="grid-column:1/-1">
         <label class="fl">Search grid (JSON)</label>
         <textarea id="searchSpace" spellcheck="false" onchange="readSearchSpace()"></textarea>
         <div class="btn-row"><button class="btn" onclick="resetSearchSpace()">Reset to default</button></div>
@@ -790,7 +804,7 @@ textarea:focus { border-color: rgba(34,211,238,.38); }
 ────────────────────────────────────────────────────────── */
 const S = {
   local: true, datasets: [], dataset: '', profile: null,
-  defaultSearchSpace: {}, types: {},
+  defaultSearchSpace: {}, searchSpaces: {}, gridPreset: 'medium', types: {},
   allFeatures: [], allTargets: [], allModels: [],
   groups: [], groupMap: {},
   selTargets: [], selModels: [], selFeatures: [],
@@ -798,6 +812,7 @@ const S = {
   runs: [], shownRun: null,
   activeLaunchJob: null,
   launchPollTimer: null,
+  stopping: false,
 };
 
 /* ──────────────────────────────────────────────────────────
@@ -829,6 +844,8 @@ async function boot() {
     S.local = cfg.local;
     S.datasets = cfg.datasets;
     S.defaultSearchSpace = cfg.search_space;
+    S.searchSpaces = cfg.search_spaces || {};
+    S.gridPreset = cfg.default_grid_preset || 'medium';
     resetSearchSpace();
     S.selModels = [...S.allModels];
     renderModelPills();
@@ -986,7 +1003,20 @@ function defaultFeatures() {
    SEARCH GRID
 ────────────────────────────────────────────────────────── */
 function resetSearchSpace() {
-  document.getElementById('searchSpace').value = JSON.stringify(S.defaultSearchSpace, null, 2);
+  const sel = document.getElementById('gridPreset');
+  if (sel) sel.value = S.gridPreset;
+  const space = (S.searchSpaces && S.searchSpaces[S.gridPreset]) || S.defaultSearchSpace;
+  document.getElementById('searchSpace').value = JSON.stringify(space, null, 2);
+  readSearchSpace();
+}
+
+/* Swap the search grid to a Light / Medium / Heavy preset. */
+function applyGridPreset() {
+  const preset = document.getElementById('gridPreset').value;
+  const space = S.searchSpaces && S.searchSpaces[preset];
+  if (!space) return;
+  S.gridPreset = preset;
+  document.getElementById('searchSpace').value = JSON.stringify(space, null, 2);
   readSearchSpace();
 }
 
@@ -1086,9 +1116,26 @@ function updateSnapshot() {
   setText('sn-f', n);
   setText('sn-r', tot>0 ? Math.round(100*(1-n/tot))+'%' : '0%');
   setText('sn-g', new Set(S.selFeatures.map(fGroup)).size);
-  const launchBusy = !!S.activeLaunchJob && !JOB_DONE.includes(S.activeLaunchJob.status);
-  document.getElementById('launchBtn').disabled =
-    !S.dataset || !S.selTargets.length || !S.selModels.length || !n || launchBusy;
+  updateLaunchButton();
+}
+
+/* While a run is going, the main CTA becomes a red Stop button in its place. */
+function updateLaunchButton() {
+  const btn = document.getElementById('launchBtn');
+  if (!btn) return;
+  const busy = !!S.activeLaunchJob && !JOB_DONE.includes(S.activeLaunchJob.status);
+  if (busy) {
+    btn.classList.add('stop');
+    btn.onclick = stopTraining;
+    btn.textContent = S.stopping ? 'Stopping…' : 'Stop Training';
+    btn.disabled = !!S.stopping;
+  } else {
+    S.stopping = false;
+    btn.classList.remove('stop');
+    btn.textContent = 'Train Selected Configuration';
+    btn.onclick = launchTraining;
+    btn.disabled = !S.dataset || !S.selTargets.length || !S.selModels.length || !S.selFeatures.length;
+  }
 }
 function setText(id, v) { document.getElementById(id).textContent = v; }
 
@@ -1324,6 +1371,24 @@ async function launchTraining() {
   }
 }
 
+async function stopTraining() {
+  const job = S.activeLaunchJob;
+  if (!job || !job.job_id || JOB_DONE.includes(job.status)) return;
+  if (!confirm('Stop this training run? Targets already finished are kept; the rest is cancelled.')) return;
+  S.stopping = true;
+  updateLaunchButton();
+  try {
+    const res = await postJson('/api/launch/stop', { job_id: job.job_id });
+    S.activeLaunchJob = res;
+    renderLaunchProgress(res);
+    toast('Stopping training…', 'ok');
+  } catch (e) {
+    S.stopping = false;
+    toast('Could not stop: ' + e.message, 'err');
+    updateLaunchButton();
+  }
+}
+
 function startLaunchPolling(jobId) {
   stopLaunchPolling();
   pollLaunchJob(jobId);
@@ -1367,6 +1432,7 @@ async function pollLaunchJob(jobId) {
 
 function renderLaunchProgress(job) {
   const el = document.getElementById('launchProgress');
+  updateLaunchButton();
   if (!job) { el.innerHTML = ''; return; }
 
   const pct = Math.max(0, Math.min(100, Number(job.progress_pct || 0)));

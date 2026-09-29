@@ -1,0 +1,29 @@
+# Version control / envs
+.git
+.gitignore
+.venv
+__pycache__/
+**/__pycache__/
+*.py[cod]
+
+# Editors / OS cruft
+.DS_Store
+**/.DS_Store
+
+# Not needed at runtime
+paper/
+data/
+app.py
+uv.lock
+README.md
+
+# Experimental / debug training runs — the published site only needs the
+# "preoperative_from_gridsearch" preset under outputs/.
+outputs/studio_runs/
+outputs/gridsearch_eval/
+outputs/_debug_progress.json
+outputs/_debug_progress_run/
+outputs/_debug_train/
+outputs/_debug_train_after_fix/
+outputs/_debug_train_final/
+outputs/_debug_train_loky/

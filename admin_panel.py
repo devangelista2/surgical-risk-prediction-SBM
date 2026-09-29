@@ -48,7 +48,8 @@ OUTPUTS_ROOT = BASE_DIR / "outputs"
 STUDIO_RUNS_ROOT = OUTPUTS_ROOT / "studio_runs"
 TUNING_CACHE_ROOT = OUTPUTS_ROOT / "tuning_cache"
 FREEZES_ROOT = OUTPUTS_ROOT / "freezes"
-SEARCH_SPACE_PATH = CONFIG_DIR / "grid_search.json"
+GRID_PRESETS = ("light", "medium", "heavy")
+DEFAULT_GRID_PRESET = "medium"
 DATASET_SUFFIXES = {".xlsx", ".xls", ".csv"}
 # Hugging Face sets SPACE_ID on a Space; uploads and training stay off there so patient data never reaches its disk.
 ON_SPACE = bool(os.environ.get("SPACE_ID"))
@@ -69,6 +70,9 @@ app = Flask(__name__)
 app.secret_key = "sbm-stratify-2024"
 LAUNCH_JOBS: dict[str, dict[str, Any]] = {}
 LAUNCH_JOBS_LOCK = threading.Lock()
+# The running training subprocess per job, and the job ids a Stop button has flagged.
+LAUNCH_PROCS: dict[str, subprocess.Popen] = {}
+LAUNCH_STOP: set[str] = set()
 
 
 # ---------------------------------------------------------------------------
@@ -287,9 +291,20 @@ def dataset_profile(name: str) -> dict[str, Any]:
     return {"dataset": name, "rows": len(df), "columns": columns}
 
 
+def search_space_preset(preset: str) -> dict[str, Any]:
+    """One grid-search preset (light / medium / heavy); ridge is regression-only and dropped."""
+    if preset not in GRID_PRESETS:
+        preset = DEFAULT_GRID_PRESET
+    raw = load_json(CONFIG_DIR / f"grid_search_{preset}.json")
+    return {k: v for k, v in raw.items() if k != "ridge"}
+
+
+def search_space_presets() -> dict[str, Any]:
+    return {preset: search_space_preset(preset) for preset in GRID_PRESETS}
+
+
 def default_search_space() -> dict[str, Any]:
-    # ridge is regression-only and every studio target is binary.
-    return {k: v for k, v in load_json(SEARCH_SPACE_PATH).items() if k != "ridge"}
+    return search_space_preset(DEFAULT_GRID_PRESET)
 
 
 def run_settings(run_root: Path) -> dict[str, Any]:
@@ -779,10 +794,39 @@ def get_run_results(run_root: Path) -> dict[str, Any]:
     return {"targets": results, "run_path": str(run_root)}
 
 
+def kill_process_tree(proc: subprocess.Popen) -> None:
+    """Stop a training subprocess and any workers it spawned, on Windows or POSIX."""
+    if proc.poll() is not None:
+        return
+    try:
+        if os.name == "nt":
+            subprocess.run(["taskkill", "/F", "/T", "/PID", str(proc.pid)],
+                           capture_output=True)
+        else:
+            proc.terminate()
+    except OSError:
+        pass
+    try:
+        proc.wait(timeout=10)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+
+
+def job_stop_requested(job_id: str | None) -> bool:
+    if not job_id:
+        return False
+    with LAUNCH_JOBS_LOCK:
+        return job_id in LAUNCH_STOP
+
+
 def run_subprocess(
-    cmd: list[str], log_path: Path, progress_path: Path, on_progress
+    cmd: list[str], log_path: Path, progress_path: Path, on_progress,
+    job_id: str | None = None,
 ) -> tuple[int, str]:
-    """Run one pipeline script, calling on_progress with its progress file until it exits."""
+    """Run one pipeline script, calling on_progress with its progress file until it exits.
+
+    While it runs the process is registered under job_id so a Stop request can kill it.
+    """
     if progress_path.exists():
         progress_path.unlink()
     child_env = os.environ.copy()
@@ -800,9 +844,21 @@ def run_subprocess(
             errors="replace",
             env=child_env,
         )
-        while proc.poll() is None:
-            on_progress(load_json_loose(progress_path))
-            time.sleep(0.8)
+        if job_id:
+            with LAUNCH_JOBS_LOCK:
+                LAUNCH_PROCS[job_id] = proc
+        try:
+            while proc.poll() is None:
+                if job_stop_requested(job_id):
+                    kill_process_tree(proc)
+                    break
+                on_progress(load_json_loose(progress_path))
+                time.sleep(0.8)
+            proc.wait()
+        finally:
+            if job_id:
+                with LAUNCH_JOBS_LOCK:
+                    LAUNCH_PROCS.pop(job_id, None)
     return proc.returncode, log_path.read_text(encoding="utf-8", errors="replace").strip()
 
 
@@ -847,6 +903,8 @@ def run_training_job(
             )
 
         for i, item in enumerate(plan):
+            if job_stop_requested(job_id):
+                break
             target = item["target"]
             slug = slugify(target)
             params = dict(item["cached"])
@@ -880,9 +938,14 @@ def run_training_job(
                 rc, log = run_subprocess(
                     cmd, runtime_root / f"{slug}-tune.log", runtime_root / f"{slug}-tune-progress.json",
                     lambda p: report(target, base + int(p.get("completed_models", 0)), p, f"Tuning {target}..."),
+                    job_id=job_id,
                 )
                 logs.append(log)
                 completed_units += len(item["to_tune"])
+                if job_stop_requested(job_id):
+                    update_launch_execution_row(execution_rows, target, status="interrupted",
+                                                message="Stopped while tuning.")
+                    break
                 tuned = load_json_loose(tuned_path)
                 selection = load_json_loose(tuned_path.with_name(f"{tuned_path.stem}_selection.json"))
                 for model in item["to_tune"]:
@@ -927,9 +990,18 @@ def run_training_job(
             rc, log = run_subprocess(
                 cmd, runtime_root / f"{slug}.log", runtime_root / f"{slug}-progress.json",
                 lambda p: report(target, base + int(p.get("completed_models", 0)), p, f"Training {target}..."),
+                job_id=job_id,
             )
             logs.append(log)
             completed_units += planned
+            if job_stop_requested(job_id):
+                update_launch_execution_row(execution_rows, target, status="interrupted",
+                                            models=", ".join(models), returncode=rc,
+                                            log="\n\n".join(logs)[-4000:],
+                                            message="Stopped while training.")
+                update_launch_job(job_id, execution=copy.deepcopy(execution_rows),
+                                  completed_units=completed_units)
+                break
             # train.py logs a model that fails and carries on with the rest.
             model_failures = [line.split(" - ")[-1].strip() for line in log.splitlines() if "Failed to train" in line]
             if rc != 0:
@@ -958,19 +1030,35 @@ def run_training_job(
         except Exception:
             pass
 
-        update_launch_job(
-            job_id,
-            status="completed",
-            finished_at=utc_now_iso(),
-            execution=copy.deepcopy(execution_rows),
-            run_results=run_results,
-            current_target=None,
-            current_model=None,
-            current_step="Training completed.",
-            completed_units=total_units,
-            completed_targets=len(plan),
-            progress_pct=100.0,
-        )
+        if job_stop_requested(job_id):
+            for row in execution_rows:
+                if row.get("status") in ("queued", "running"):
+                    row.update(status="interrupted", message="Stopped before this target ran.")
+            update_launch_job(
+                job_id,
+                status="interrupted",
+                finished_at=utc_now_iso(),
+                execution=copy.deepcopy(execution_rows),
+                run_results=run_results,
+                current_target=None,
+                current_model=None,
+                current_step="Training was stopped.",
+                error=f"You stopped the run. {RETRY_ADVICE}",
+            )
+        else:
+            update_launch_job(
+                job_id,
+                status="completed",
+                finished_at=utc_now_iso(),
+                execution=copy.deepcopy(execution_rows),
+                run_results=run_results,
+                current_target=None,
+                current_model=None,
+                current_step="Training completed.",
+                completed_units=total_units,
+                completed_targets=len(plan),
+                progress_pct=100.0,
+            )
     except Exception as exc:
         update_launch_job(
             job_id,
@@ -979,6 +1067,10 @@ def run_training_job(
             error=f"The studio hit an error it did not expect: {exc}. {RETRY_ADVICE}",
             current_step="Training failed.",
         )
+    finally:
+        with LAUNCH_JOBS_LOCK:
+            LAUNCH_STOP.discard(job_id)
+            LAUNCH_PROCS.pop(job_id, None)
 
 
 # ---------------------------------------------------------------------------
@@ -996,6 +1088,8 @@ def get_config():
         "local": not ON_SPACE,
         "datasets": [] if ON_SPACE else list_datasets(),
         "search_space": default_search_space(),
+        "search_spaces": search_space_presets(),
+        "default_grid_preset": DEFAULT_GRID_PRESET,
     })
 
 
@@ -1150,6 +1244,30 @@ def launch_training_status():
     if not job:
         return jsonify({"error": "Training job not found"}), 404
     return jsonify(job)
+
+
+@app.route("/api/launch/stop", methods=["POST"])
+@local_only
+def stop_training():
+    data = request.get_json(silent=True) or {}
+    job_id = (data.get("job_id") or "").strip()
+    if not job_id:
+        job_id = (latest_launch_job() or {}).get("job_id", "")
+    if not job_id:
+        return jsonify({"error": "There is no run to stop."}), 404
+    job = get_launch_job(job_id)
+    if not job:
+        return jsonify({"error": "Training job not found"}), 404
+    if job["status"] in JOB_DONE:
+        return jsonify({"error": "That run has already finished."}), 409
+
+    with LAUNCH_JOBS_LOCK:
+        LAUNCH_STOP.add(job_id)
+        proc = LAUNCH_PROCS.get(job_id)
+    update_launch_job(job_id, current_step="Stopping training...")
+    if proc:
+        kill_process_tree(proc)
+    return jsonify(get_launch_job(job_id) or {})
 
 
 @app.route("/api/runs")
