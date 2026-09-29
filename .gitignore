@@ -11,3 +11,8 @@ wheels/
 
 # Data
 data/
+
+# Studio output trained on local data
+outputs/studio_runs/
+outputs/tuning_cache/
+outputs/freezes/

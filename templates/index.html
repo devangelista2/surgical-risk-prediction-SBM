@@ -511,11 +511,23 @@ code { font-family: 'JetBrains Mono', monospace; font-size: .81em; padding: .1em
 .empty-state { text-align: center; padding: 3rem 1rem; color: var(--t3); }
 .empty-state .ei { font-size: 2rem; opacity: .25; margin-bottom: .6rem; }
 
+textarea {
+  width: 100%; min-height: 220px; padding: .55rem .72rem;
+  border: 1px solid var(--line-2); border-radius: var(--r-sm);
+  background: var(--lift); color: var(--t1); outline: none; resize: vertical;
+  font-family: 'JetBrains Mono', monospace; font-size: .72rem;
+}
+textarea:focus { border-color: rgba(34,211,238,.38); }
+.chk { display: flex; align-items: center; gap: .45rem; font-size: .76rem; color: var(--t2); cursor: pointer; }
+.chk input { accent-color: var(--cyan); }
+.dtbl select { padding: .22rem .5rem; font-size: .74rem; }
+
 @media (max-width: 1000px) {
   .g3,.g2w { grid-template-columns: 1fr; }
   .g5 { grid-template-columns: repeat(3,1fr); }
   .g2 { grid-template-columns: 1fr; }
   .g4 { grid-template-columns: 1fr 1fr; }
+  .adv-grid { grid-template-columns: 1fr 1fr !important; }
   .launch-meta { grid-template-columns: 1fr 1fr; }
   .page { padding: 1.4rem 1rem 4rem; }
   .topbar { padding: 0 1rem; }
@@ -561,14 +573,30 @@ code { font-family: 'JetBrains Mono', monospace; font-size: .81em; padding: .1em
 
   <div class="ph">
     <div class="ph-title">Launchpad</div>
-    <div class="ph-sub">Configure outcomes, select learners, shape the feature set, and launch training.</div>
+    <div class="ph-sub">Pick a dataset and outcomes, shape the feature set, and launch tuning and training.</div>
   </div>
 
   <!-- Setup 3-col -->
   <div class="g3 mb1">
 
     <div class="card">
-      <div class="card-label">Step 1 · Outcome Targets</div>
+      <div class="card-label">Step 1 · Dataset</div>
+      <select id="datasetSel" onchange="selectDataset(this.value)"></select>
+      <div class="btn-row">
+        <button class="btn" onclick="document.getElementById('datasetFile').click()">Upload file…</button>
+        <input type="file" id="datasetFile" accept=".xlsx,.xls,.csv" hidden onchange="uploadDataset(this)" />
+      </div>
+      <div class="sc-cap mt1" id="datasetInfo">Excel or CSV, one row per patient. Files stay in <code>data/</code> on this machine.</div>
+      <details class="mt1">
+        <summary>Load settings from a previous run</summary>
+        <select id="settingsRunSel"></select>
+        <div class="btn-row"><button class="btn" onclick="loadSettingsFromRun()">Load settings</button></div>
+      </details>
+    </div>
+
+    <div class="card">
+      <div class="card-label">Step 2 · Outcome Targets</div>
+      <div class="sc-cap">Yes/no columns in the dataset. Each one gets its own models.</div>
       <div class="pill-group" id="targetPills"></div>
       <div class="btn-row">
         <button class="btn" onclick="selectAllTargets()">All</button>
@@ -577,67 +605,77 @@ code { font-family: 'JetBrains Mono', monospace; font-size: .81em; padding: .1em
     </div>
 
     <div class="card">
-      <div class="card-label">Step 2 · Learners</div>
+      <div class="card-label">Step 3 · Run Configuration</div>
+      <div class="mb1">
+        <label class="fl">Run label</label>
+        <input type="text" id="runName" oninput="S.runNameEdited=true" />
+      </div>
+    </div>
+  </div>
+
+  <details class="avail card mb1" style="padding:.72rem 1rem">
+    <summary>Advanced training settings</summary>
+    <div class="mt1">
+      <label class="fl">Learners</label>
       <div class="pill-group" id="modelPills"></div>
       <div class="btn-row">
         <button class="btn" onclick="selectAllModels()">All</button>
         <button class="btn" onclick="clearModels()">None</button>
       </div>
     </div>
-
-    <div class="card">
-      <div class="card-label">Step 3 · Run Configuration</div>
-      <div class="mb1">
-        <label class="fl">Run label</label>
-        <input type="text" id="runName" placeholder="e.g. symptom-lite-temporal" />
+    <div class="adv-grid" style="grid-template-columns:repeat(4,1fr)">
+      <div>
+        <label class="fl">Split strategy</label>
+        <select id="splitStrategy">
+          <option value="temporal">Temporal</option>
+          <option value="random">Random</option>
+          <option value="predefined">Predefined</option>
+        </select>
       </div>
-      <details>
-        <summary>Advanced training settings</summary>
-        <div class="adv-grid">
-          <div>
-            <label class="fl">Split strategy</label>
-            <select id="splitStrategy">
-              <option value="temporal">Temporal</option>
-              <option value="random">Random</option>
-              <option value="predefined">Predefined</option>
-            </select>
-          </div>
-          <div class="sld-wrap">
-            <div class="sld-head"><span class="sld-lbl">Test size</span><span class="sld-val" id="v-ts">0.20</span></div>
-            <input type="range" id="testSize"  min=".10" max=".40" step=".01" value=".20" oninput="sv('v-ts',+this.value,2)"/>
-          </div>
-          <div class="sld-wrap">
-            <div class="sld-head"><span class="sld-lbl">Threshold val</span><span class="sld-val" id="v-tv">0.20</span></div>
-            <input type="range" id="threshVal" min=".05" max=".40" step=".01" value=".20" oninput="sv('v-tv',+this.value,2)"/>
-          </div>
-          <div class="sld-wrap">
-            <div class="sld-head"><span class="sld-lbl">Min recall</span><span class="sld-val" id="v-mr">0.90</span></div>
-            <input type="range" id="minRecall" min=".50" max=".99" step=".01" value=".90" oninput="sv('v-mr',+this.value,2)"/>
-          </div>
-          <div class="sld-wrap">
-            <div class="sld-head"><span class="sld-lbl">F-beta</span><span class="sld-val" id="v-fb">2.0</span></div>
-            <input type="range" id="fBeta"     min=".5"  max="5.0" step=".1"  value="2.0" oninput="sv('v-fb',+this.value,1)"/>
-          </div>
-          <div class="sld-wrap">
-            <div class="sld-head"><span class="sld-lbl">FN cost</span><span class="sld-val" id="v-fn">5.0</span></div>
-            <input type="range" id="fnCost"    min=".5"  max="10.0" step=".5" value="5.0" oninput="sv('v-fn',+this.value,1)"/>
-          </div>
-          <div class="sld-wrap">
-            <div class="sld-head"><span class="sld-lbl">FP cost</span><span class="sld-val" id="v-fp">1.0</span></div>
-            <input type="range" id="fpCost"    min=".5"  max="10.0" step=".5" value="1.0" oninput="sv('v-fp',+this.value,1)"/>
-          </div>
-          <div>
-            <label class="fl">Split column</label>
-            <input type="text" id="splitColumn" value="Split" />
-          </div>
-          <div>
-            <label class="fl">Date column</label>
-            <input type="text" id="dateColumn" value="Date of surgery" />
-          </div>
-        </div>
-      </details>
+      <div class="sld-wrap">
+        <div class="sld-head"><span class="sld-lbl">Test size</span><span class="sld-val" id="v-ts">0.20</span></div>
+        <input type="range" id="testSize"  min=".10" max=".40" step=".01" value=".20" oninput="sv('v-ts',+this.value,2)"/>
+      </div>
+      <div class="sld-wrap">
+        <div class="sld-head"><span class="sld-lbl">Threshold val</span><span class="sld-val" id="v-tv">0.20</span></div>
+        <input type="range" id="threshVal" min=".05" max=".40" step=".01" value=".20" oninput="sv('v-tv',+this.value,2)"/>
+      </div>
+      <div class="sld-wrap">
+        <div class="sld-head"><span class="sld-lbl">Min recall</span><span class="sld-val" id="v-mr">0.90</span></div>
+        <input type="range" id="minRecall" min=".50" max=".99" step=".01" value=".90" oninput="sv('v-mr',+this.value,2)"/>
+      </div>
+      <div class="sld-wrap">
+        <div class="sld-head"><span class="sld-lbl">F-beta</span><span class="sld-val" id="v-fb">2.0</span></div>
+        <input type="range" id="fBeta"     min=".5"  max="5.0" step=".1"  value="2.0" oninput="sv('v-fb',+this.value,1)"/>
+      </div>
+      <div class="sld-wrap">
+        <div class="sld-head"><span class="sld-lbl">FN cost</span><span class="sld-val" id="v-fn">5.0</span></div>
+        <input type="range" id="fnCost"    min=".5"  max="10.0" step=".5" value="5.0" oninput="sv('v-fn',+this.value,1)"/>
+      </div>
+      <div class="sld-wrap">
+        <div class="sld-head"><span class="sld-lbl">FP cost</span><span class="sld-val" id="v-fp">1.0</span></div>
+        <input type="range" id="fpCost"    min=".5"  max="10.0" step=".5" value="1.0" oninput="sv('v-fp',+this.value,1)"/>
+      </div>
+      <div>
+        <label class="fl">Split column</label>
+        <input type="text" id="splitColumn" value="Split" list="columnList" />
+      </div>
+      <div>
+        <label class="fl">Date column</label>
+        <input type="text" id="dateColumn" value="Date of surgery" list="columnList" />
+      </div>
+      <div style="grid-column:1/-1">
+        <label class="chk"><input type="checkbox" id="forceRetune" /> Re-tune even when saved tuning matches</label>
+        <div class="sc-cap">Tuning splits the data the same way as training.</div>
+      </div>
+      <div style="grid-column:1/-1">
+        <label class="fl">Search grid (JSON)</label>
+        <textarea id="searchSpace" spellcheck="false" onchange="readSearchSpace()"></textarea>
+        <div class="btn-row"><button class="btn" onclick="resetSearchSpace()">Reset to default</button></div>
+      </div>
     </div>
-  </div>
+    <datalist id="columnList"></datalist>
+  </details>
 
   <!-- Snapshot 5-col -->
   <div class="g5 mb1" style="margin-bottom:1.4rem">
@@ -654,15 +692,9 @@ code { font-family: 'JetBrains Mono', monospace; font-size: .81em; padding: .1em
       <div class="sc-label">Reduction</div><div class="sc-value" id="sn-r">0%</div><div class="sc-cap">Vs. full pool</div>
     </div>
     <div class="sc"><div class="sc-glow" style="background:var(--amber)"></div>
-      <div class="sc-label">Groups</div><div class="sc-value" id="sn-g">0</div><div class="sc-cap">Clinical areas</div>
+      <div class="sc-label">Types</div><div class="sc-value" id="sn-g">0</div><div class="sc-cap">Column types</div>
     </div>
   </div>
-
-  <!-- Availability collapsible -->
-  <details class="avail card" style="margin-bottom:1.4rem;padding:.72rem 1rem">
-    <summary>Target-by-target model availability</summary>
-    <div class="mt1" id="availTbl"></div>
-  </details>
 
   <!-- ── Feature Builder ── -->
   <div class="sh">
@@ -674,10 +706,7 @@ code { font-family: 'JetBrains Mono', monospace; font-size: .81em; padding: .1em
 
   <!-- Preset strip -->
   <div class="preset-strip">
-    <button class="pbtn" onclick="applyPreset('all')"     ><span class="pi">◈</span>Full Preoperative</button>
-    <button class="pbtn" onclick="applyPreset('clinical')" ><span class="pi">♥</span>Clinical Core</button>
-    <button class="pbtn" onclick="applyPreset('imaging')"  ><span class="pi">◉</span>Imaging Focus</button>
-    <button class="pbtn" onclick="applyPreset('compact')"  ><span class="pi">◎</span>Compact Seed</button>
+    <button class="pbtn" onclick="applyPreset('all')"><span class="pi">◈</span>All Usable Columns</button>
     <button class="pbtn pdanger" onclick="applyPreset('clear')"><span class="pi">×</span>Clear All</button>
   </div>
 
@@ -694,13 +723,19 @@ code { font-family: 'JetBrains Mono', monospace; font-size: .81em; padding: .1em
 
       <!-- Group grid -->
       <div id="featureGrid"></div>
+
+      <details class="mt1">
+        <summary>Advanced: column types</summary>
+        <div class="hint mt1 mb05">How each selected column is read. Numbers and yes/no columns are used as they are; categories are one-hot encoded.</div>
+        <div class="tbl-wrap" id="typeTbl"></div>
+      </details>
     </div>
 
     <!-- RIGHT: summary -->
     <div style="position:sticky;top:68px;align-self:start">
       <div class="hint mb1">
         <strong>Selected subset</strong><br>
-        Chips are colour-coded by group. Use this to judge burden, balance, and what to prune next.
+        Chips are colour-coded by column type. Untick other outcome columns and anything recorded after surgery: they must not be inputs.
       </div>
 
       <div id="selCloud" class="chip-cloud mb1"></div>
@@ -754,35 +789,35 @@ code { font-family: 'JetBrains Mono', monospace; font-size: .81em; padding: .1em
    STATE
 ────────────────────────────────────────────────────────── */
 const S = {
+  local: true, datasets: [], dataset: '', profile: null,
+  defaultSearchSpace: {}, types: {},
   allFeatures: [], allTargets: [], allModels: [],
   groups: [], groupMap: {},
   selTargets: [], selModels: [], selFeatures: [],
-  runs: [],
+  runNameEdited: false,
+  runs: [], shownRun: null,
   activeLaunchJob: null,
   launchPollTimer: null,
 };
 
 /* ──────────────────────────────────────────────────────────
-   GROUP  COLORS
+   COLUMN TYPES  (feature groups)
 ────────────────────────────────────────────────────────── */
+const TYPE_LABEL = { numeric:'Numbers', binary:'Yes / No', categorical:'Categories', date:'Dates', multi:'Multi-label' };
 const GC = {
-  'Demographics & Timing': { bg:'rgba(251,191,36,.12)', bo:'rgba(251,191,36,.28)', tx:'#FCD34D', dot:'#FBBF24' },
-  'Comorbidities':          { bg:'rgba(248,113,113,.11)', bo:'rgba(248,113,113,.26)', tx:'#FCA5A5', dot:'#F87171' },
-  'Presentation':           { bg:'rgba(167,139,250,.12)', bo:'rgba(167,139,250,.28)', tx:'#C4B5FD', dot:'#A78BFA' },
-  'Functional Status':      { bg:'rgba(52,211,153,.10)',  bo:'rgba(52,211,153,.26)',  tx:'#6EE7B7', dot:'#34D399' },
-  'Clinical Core':          { bg:'rgba(96,165,250,.11)',  bo:'rgba(96,165,250,.26)',  tx:'#93C5FD', dot:'#60A5FA' },
-  'Imaging & Anatomy':      { bg:'rgba(34,211,238,.11)',  bo:'rgba(34,211,238,.27)',  tx:'#67E8F9', dot:'#22D3EE' },
+  'Numbers':     { bg:'rgba(96,165,250,.11)',  bo:'rgba(96,165,250,.26)',  tx:'#93C5FD', dot:'#60A5FA' },
+  'Yes / No':    { bg:'rgba(52,211,153,.10)',  bo:'rgba(52,211,153,.26)',  tx:'#6EE7B7', dot:'#34D399' },
+  'Categories':  { bg:'rgba(167,139,250,.12)', bo:'rgba(167,139,250,.28)', tx:'#C4B5FD', dot:'#A78BFA' },
+  'Dates':       { bg:'rgba(251,191,36,.12)',  bo:'rgba(251,191,36,.28)',  tx:'#FCD34D', dot:'#FBBF24' },
+  'Multi-label': { bg:'rgba(248,113,113,.11)', bo:'rgba(248,113,113,.26)', tx:'#FCA5A5', dot:'#F87171' },
 };
 const GCD = { bg:'rgba(255,255,255,.05)', bo:'rgba(255,255,255,.12)', tx:'#94A3B8', dot:'#94A3B8' };
 const gc  = g => GC[g] || GCD;
+const fGroup = f => TYPE_LABEL[S.types[f]] || 'Numbers';
 
-function fGroup(f) {
-  if (f.startsWith('Comorbidities_')) return 'Comorbidities';
-  if (f.startsWith('Symptoms_'))      return 'Presentation';
-  if (f.startsWith('Radio_') || f.startsWith('Optic') || f.startsWith('ICA/')) return 'Imaging & Anatomy';
-  if (f.includes('KPS') || ['ASA','Charlson Comorbidity Index'].includes(f)) return 'Functional Status';
-  if (['Age','Sex','Date of surgery','Date of Birth'].includes(f)) return 'Demographics & Timing';
-  return 'Clinical Core';
+function rebuildGroups() {
+  S.groups = Object.values(TYPE_LABEL).filter(g => S.allFeatures.some(f => fGroup(f) === g));
+  S.groupMap = Object.fromEntries(S.groups.map(g => [g, S.allFeatures.filter(f => fGroup(f) === g)]));
 }
 
 /* ──────────────────────────────────────────────────────────
@@ -791,27 +826,50 @@ function fGroup(f) {
 async function boot() {
   try {
     const cfg = await api('/api/config');
-    S.allFeatures = cfg.all_features;
-    S.allTargets  = cfg.targets;
-    S.allModels   = cfg.all_models;
-    S.groups      = cfg.groups;
-    S.groupMap    = cfg.group_map;
-    S.selTargets  = [...S.allTargets];
-    S.selModels   = [...S.allModels];
-    S.selFeatures = [...S.allFeatures];
-
-    document.getElementById('hdrT').textContent = S.allTargets.length;
-    document.getElementById('hdrF').textContent = S.allFeatures.length;
-
-    renderTargetPills();
+    S.local = cfg.local;
+    S.datasets = cfg.datasets;
+    S.defaultSearchSpace = cfg.search_space;
+    resetSearchSpace();
+    S.selModels = [...S.allModels];
     renderModelPills();
-    buildFeatureGrid();
-    renderSelCloud();
-    updateSnapshot();
-    scheduleDistChart();
-    refreshAvailability();
     refreshRuns();
+    if (!S.local) {
+      // Hosted copy: no uploads or training, results only.
+      document.querySelector('.tbnav-btn').style.display = 'none';
+      switchTab('results');
+      return;
+    }
+    renderDatasetSel();
+    if (S.datasets.length) await selectDataset(S.datasets[0]);
+    else renderAll();
+    showLatestJob();
   } catch(e) { toast('Config load failed: ' + e.message, 'err'); }
+}
+
+const JOB_DONE = ['completed', 'failed', 'interrupted'];
+
+/* The last run, also after a reload or a restart of the studio: still going, or how it ended. */
+async function showLatestJob() {
+  let job;
+  try { job = await api('/api/launch/status'); } catch (e) { return; }
+  if (!job.job_id) return;
+  S.activeLaunchJob = job;
+  renderLaunchProgress(job);
+  if (JOB_DONE.includes(job.status)) renderLaunchOut(job);
+  else startLaunchPolling(job.job_id);
+}
+
+function renderAll() {
+  document.getElementById('hdrT').textContent = S.allTargets.length;
+  document.getElementById('hdrF').textContent = S.allFeatures.length;
+  rebuildGroups();
+  renderTargetPills();
+  renderModelPills();
+  buildFeatureGrid();
+  renderSelCloud();
+  renderTypeTable();
+  updateSnapshot();
+  scheduleDistChart();
 }
 
 /* ──────────────────────────────────────────────────────────
@@ -827,14 +885,17 @@ async function api(url, opts = {}) {
 
   if (!r.ok) {
     const text = await r.text();
-    try {
-      const parsed = JSON.parse(text);
-      throw new Error(parsed.error || text);
-    } catch (_) {
-      throw new Error(text);
-    }
+    let body = {};
+    try { body = JSON.parse(text); } catch (_) {}
+    const err = new Error(body.error || text);
+    err.problems = body.problems || [];
+    throw err;
   }
   return r.json();
+}
+
+function postJson(url, body) {
+  return api(url, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
 }
 
 /* ──────────────────────────────────────────────────────────
@@ -852,25 +913,166 @@ function switchTab(name) {
    SLIDER HELPER
 ────────────────────────────────────────────────────────── */
 function sv(id, val, dec) { document.getElementById(id).textContent = Number(val).toFixed(dec); }
+function setSlider(id, labelId, val, dec) {
+  document.getElementById(id).value = val;
+  sv(labelId, val, dec);
+}
+
+/* ──────────────────────────────────────────────────────────
+   DATASET
+────────────────────────────────────────────────────────── */
+function renderDatasetSel() {
+  const sel = document.getElementById('datasetSel');
+  sel.innerHTML = S.datasets.length
+    ? S.datasets.map(d => `<option value="${esc(d)}">${esc(d)}</option>`).join('')
+    : '<option value="">— Upload a dataset —</option>';
+  sel.value = S.dataset;
+}
+
+async function uploadDataset(input) {
+  const file = input.files[0];
+  input.value = '';
+  if (!file) return;
+  const form = new FormData();
+  form.append('file', file);
+  showLoader('Uploading ' + file.name + '…');
+  try {
+    const d = await api('/api/datasets', { method:'POST', body: form });
+    hideLoader();
+    S.datasets = d.datasets;
+    await selectDataset(d.dataset);
+    toast('Uploaded ' + d.dataset + '.', 'ok');
+  } catch(e) { hideLoader(); toast('Upload failed: ' + e.message, 'err'); }
+}
+
+async function selectDataset(name) {
+  showLoader('Reading ' + name + '…');
+  try {
+    const p = await api('/api/dataset/profile?name=' + encodeURIComponent(name));
+    hideLoader();
+    S.dataset = name;
+    S.profile = p;
+    S.types = Object.fromEntries(p.columns.map(c => [c.name, c.type]));
+    S.allTargets = p.columns.filter(c => c.type === 'binary').map(c => c.name);
+    S.selTargets = [];
+    S.allFeatures = p.columns.map(c => c.name);
+    S.selFeatures = defaultFeatures();
+    const dates = p.columns.filter(c => c.type === 'date').map(c => c.name);
+    const dateCol = dates.find(n => /surgery/i.test(n)) || dates.find(n => !/birth/i.test(n)) || '';
+    document.getElementById('dateColumn').value = dateCol;
+    document.querySelector('#splitStrategy option[value="temporal"]').disabled = !dateCol;
+    if (!dateCol) document.getElementById('splitStrategy').value = 'random';
+    document.getElementById('columnList').innerHTML =
+      S.allFeatures.map(f => `<option value="${esc(f)}"></option>`).join('');
+    if (!S.runNameEdited) {
+      const stem = name.replace(/\.[^.]+$/, '');
+      const day = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+      document.getElementById('runName').value = `${stem}-${day}`;
+    }
+    document.getElementById('datasetInfo').textContent =
+      `${p.rows} rows · ${p.columns.length} columns · ${S.allTargets.length} yes/no columns`;
+    renderDatasetSel();
+    renderAll();
+  } catch(e) { hideLoader(); toast('Could not read dataset: ' + e.message, 'err'); }
+}
+
+// Every column except targets, dates and identifiers.
+function defaultFeatures() {
+  const skip = new Set(S.profile.columns.filter(c => c.type === 'date' || c.id_like).map(c => c.name));
+  return S.allFeatures.filter(f => !skip.has(f) && !S.selTargets.includes(f));
+}
+
+/* ──────────────────────────────────────────────────────────
+   SEARCH GRID
+────────────────────────────────────────────────────────── */
+function resetSearchSpace() {
+  document.getElementById('searchSpace').value = JSON.stringify(S.defaultSearchSpace, null, 2);
+  readSearchSpace();
+}
+
+function readSearchSpace() {
+  let grid;
+  try { grid = JSON.parse(document.getElementById('searchSpace').value); }
+  catch (e) { toast('Search grid is not valid JSON: ' + e.message, 'err'); return null; }
+  S.allModels = Object.keys(grid);
+  S.selModels = S.selModels.filter(m => S.allModels.includes(m));
+  renderModelPills();
+  updateSnapshot();
+  return grid;
+}
+
+/* ──────────────────────────────────────────────────────────
+   LOAD SETTINGS FROM A RUN
+────────────────────────────────────────────────────────── */
+async function loadSettingsFromRun() {
+  const path = document.getElementById('settingsRunSel').value;
+  if (!path) { toast('Pick a run first.', 'err'); return; }
+  try {
+    const st = await api('/api/run/settings?path=' + encodeURIComponent(path));
+    if (!S.datasets.includes(st.dataset)) {
+      toast(`That run used ${st.dataset}, which is not in data/. Upload it first.`, 'err'); return;
+    }
+    await selectDataset(st.dataset);
+    applySettings(st);
+    toast('Settings loaded.', 'ok');
+  } catch(e) { toast('Could not load settings: ' + e.message, 'err'); }
+}
+
+function applySettings(st) {
+  const missing = [...st.targets, ...st.selected_features].filter(c => !S.allFeatures.includes(c));
+  S.selTargets = st.targets.filter(t => S.allTargets.includes(t));
+  st.selected_features.forEach(f => {
+    if (!(f in S.types)) return;
+    if (st.cols_string.includes(f)) S.types[f] = 'categorical';
+    else if (st.cols_date.includes(f)) S.types[f] = 'date';
+    else if (st.cols_multi.includes(f)) S.types[f] = 'multi';
+    else if (['categorical', 'date', 'multi'].includes(S.types[f])) S.types[f] = 'numeric';
+  });
+  S.selFeatures = S.allFeatures.filter(f => st.selected_features.includes(f) && !S.selTargets.includes(f));
+  if (st.search_space) {
+    document.getElementById('searchSpace').value = JSON.stringify(st.search_space, null, 2);
+    readSearchSpace();
+  }
+  const models = st.models.filter(m => S.allModels.includes(m));
+  if (models.length) S.selModels = models;
+  document.getElementById('splitStrategy').value = st.split_strategy;
+  document.getElementById('splitColumn').value = st.split_column;
+  document.getElementById('dateColumn').value = st.date_column;
+  setSlider('testSize', 'v-ts', st.test_size, 2);
+  setSlider('threshVal', 'v-tv', st.threshold_val_size, 2);
+  setSlider('minRecall', 'v-mr', st.min_recall, 2);
+  setSlider('fBeta', 'v-fb', st.f_beta, 1);
+  setSlider('fnCost', 'v-fn', st.fn_cost, 1);
+  setSlider('fpCost', 'v-fp', st.fp_cost, 1);
+  renderAll();
+  if (missing.length) toast(`${missing.length} column(s) from that run are not in this dataset: ${missing.slice(0, 5).join(', ')}`, 'err');
+}
 
 /* ──────────────────────────────────────────────────────────
    TARGET / MODEL PILLS
 ────────────────────────────────────────────────────────── */
+function pills(all, selected, handler) {
+  return all.map(v =>
+    `<span class="pill ${selected.includes(v)?'on':''}" data-v="${esc(v)}" onclick="${handler}(this.dataset.v)">`+
+    `<span class="pill-dot"></span>${esc(v)}</span>`).join('');
+}
 function renderTargetPills() {
-  document.getElementById('targetPills').innerHTML = S.allTargets.map(t =>
-    `<span class="pill ${S.selTargets.includes(t)?'on':''}" onclick="toggleTarget('${esc(t)}')">`+
-    `<span class="pill-dot"></span>${esc(t)}</span>`).join('');
+  document.getElementById('targetPills').innerHTML = S.allTargets.length
+    ? pills(S.allTargets, S.selTargets, 'toggleTarget')
+    : '<span class="sc-cap">No yes/no columns found.</span>';
 }
-function renderModelPills() {
-  document.getElementById('modelPills').innerHTML = S.allModels.map(m =>
-    `<span class="pill ${S.selModels.includes(m)?'on':''}" onclick="toggleModel('${esc(m)}')">`+
-    `<span class="pill-dot"></span>${esc(m)}</span>`).join('');
+function renderModelPills() { document.getElementById('modelPills').innerHTML = pills(S.allModels, S.selModels, 'toggleModel'); }
+// A target is never an input.
+function setTargets(list) {
+  S.selTargets = list;
+  S.selFeatures = S.selFeatures.filter(f => !list.includes(f));
+  renderAll();
 }
-function toggleTarget(t) { toggle(S.selTargets, t); renderTargetPills(); updateSnapshot(); refreshAvailability(); }
+function toggleTarget(t) { const l=[...S.selTargets]; toggle(l, t); setTargets(l); }
 function toggleModel(m)  { toggle(S.selModels,  m); renderModelPills();  updateSnapshot(); }
 function toggle(arr, v)  { const i=arr.indexOf(v); if(i>=0) arr.splice(i,1); else arr.push(v); }
-function selectAllTargets() { S.selTargets=[...S.allTargets]; renderTargetPills(); updateSnapshot(); refreshAvailability(); }
-function clearTargets()     { S.selTargets=[];                renderTargetPills(); updateSnapshot(); refreshAvailability(); }
+function selectAllTargets() { setTargets([...S.allTargets]); }
+function clearTargets()     { setTargets([]); }
 function selectAllModels()  { S.selModels=[...S.allModels];   renderModelPills();  updateSnapshot(); }
 function clearModels()      { S.selModels=[];                 renderModelPills();  updateSnapshot(); }
 
@@ -884,72 +1086,47 @@ function updateSnapshot() {
   setText('sn-f', n);
   setText('sn-r', tot>0 ? Math.round(100*(1-n/tot))+'%' : '0%');
   setText('sn-g', new Set(S.selFeatures.map(fGroup)).size);
-  const launchBusy = !!S.activeLaunchJob && !['completed','failed'].includes(S.activeLaunchJob.status);
+  const launchBusy = !!S.activeLaunchJob && !JOB_DONE.includes(S.activeLaunchJob.status);
   document.getElementById('launchBtn').disabled =
-    !S.selTargets.length || !S.selModels.length || !n || launchBusy;
+    !S.dataset || !S.selTargets.length || !S.selModels.length || !n || launchBusy;
 }
 function setText(id, v) { document.getElementById(id).textContent = v; }
 
 /* ──────────────────────────────────────────────────────────
-   AVAILABILITY
+   PRESET + GROUP ACTIONS
 ────────────────────────────────────────────────────────── */
-async function refreshAvailability() {
-  const d = await api('/api/models-for-targets', {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({targets: S.selTargets})
-  });
-  const prev = new Set(S.selModels);
-  S.allModels = d.models;
-  S.selModels = d.models.filter(m => prev.has(m));
-  if (!S.selModels.length) S.selModels = [...d.models];
-  renderModelPills(); updateSnapshot();
-  const el = document.getElementById('availTbl');
-  el.innerHTML = d.availability.length
-    ? tbl(['target','available_models','n_models'], d.availability)
-    : '<p style="color:var(--t3);font-size:.78rem">No targets selected.</p>';
+function applyPreset(p) { setFeatures(p === 'clear' ? [] : defaultFeatures()); }
+
+function groupActionAll(group) {
+  const add = (S.groupMap[group] || []).filter(f => !S.selTargets.includes(f));
+  setFeatures(S.allFeatures.filter(f => S.selFeatures.includes(f) || add.includes(f)));
 }
-
-/* ──────────────────────────────────────────────────────────
-   PRESET + GROUP ACTIONS  (via API)
-────────────────────────────────────────────────────────── */
-async function applyPreset(p) {
-  const d = await api('/api/features/preset', {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({preset:p, all_features:S.allFeatures})
-  });
-  setFeatures(d.features);
-}
-
-async function groupActionAll(group)  { await applyGroupOp('add',    group); }
-async function groupActionNone(group) { await applyGroupOp('remove', group); }
-
-async function applyGroupOp(action, group) {
-  const d = await api('/api/features/group-action', {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({action, group, all_features:S.allFeatures, selected:S.selFeatures})
-  });
-  setFeatures(d.features);
+function groupActionNone(group) {
+  const drop = new Set(S.groupMap[group] || []);
+  setFeatures(S.selFeatures.filter(f => !drop.has(f)));
 }
 
 function setFeatures(list) {
   S.selFeatures = list;
   refreshGrid();
   renderSelCloud();
+  renderTypeTable();
   updateSnapshot();
   scheduleDistChart();
 }
 
 /* ──────────────────────────────────────────────────────────
-   FEATURE TOGGLE GRID  ← new core interaction
+   FEATURE TOGGLE GRID
 ────────────────────────────────────────────────────────── */
 function buildFeatureGrid() {
   const container = document.getElementById('featureGrid');
-  container.innerHTML = '';
+  container.innerHTML = S.dataset ? '' : '<div class="hint">Pick or upload a dataset to see its columns.</div>';
   const sel = new Set(S.selFeatures);
 
   S.groups.forEach(group => {
     const c     = gc(group);
-    const feats = S.groupMap[group] || [];
+    const feats = (S.groupMap[group] || []).filter(f => !S.selTargets.includes(f));
+    if (!feats.length) return;
 
     const section = document.createElement('div');
     section.className  = 'fg-group';
@@ -965,8 +1142,8 @@ function buildFeatureGrid() {
         <span class="fg-group-count" id="gc-${safeid(group)}">${feats.filter(f=>sel.has(f)).length}/${feats.length}</span>
       </div>
       <div class="fg-group-btns">
-        <button class="fg-gbtn" onclick="groupActionAll('${group.replace(/'/g,"\\'")}')">All</button>
-        <button class="fg-gbtn" onclick="groupActionNone('${group.replace(/'/g,"\\'")}')">None</button>
+        <button class="fg-gbtn" onclick="groupActionAll('${group}')">All</button>
+        <button class="fg-gbtn" onclick="groupActionNone('${group}')">None</button>
       </div>`;
     section.appendChild(head);
 
@@ -997,41 +1174,31 @@ function buildFeatureGrid() {
 function refreshGrid() {
   const sel = new Set(S.selFeatures);
   document.querySelectorAll('.fg-chip').forEach(chip => {
-    const feat  = chip.dataset.feat;
-    const group = chip.dataset.group;
-    const on    = sel.has(feat);
-    const c     = gc(group);
+    const on = sel.has(chip.dataset.feat);
+    const c  = gc(chip.dataset.group);
     chip.classList.toggle('on', on);
     chip.style.cssText = on ? `background:${c.bg};border-color:${c.bo};color:${c.tx}` : '';
   });
   // Update per-group counts
-  S.groups.forEach(group => {
-    const feats  = S.groupMap[group] || [];
-    const cnt    = feats.filter(f => sel.has(f)).length;
-    const el     = document.getElementById('gc-' + safeid(group));
-    if (el) el.textContent = `${cnt}/${feats.length}`;
-    // Dim the whole section if all off
-    const sec = document.querySelector(`.fg-group[data-group="${group}"]`);
-    if (sec) sec.classList.toggle('dimmed', cnt === 0);
+  document.querySelectorAll('.fg-group').forEach(sec => {
+    const chips = [...sec.querySelectorAll('.fg-chip')];
+    const cnt   = chips.filter(ch => sel.has(ch.dataset.feat)).length;
+    const el    = document.getElementById('gc-' + safeid(sec.dataset.group));
+    if (el) el.textContent = `${cnt}/${chips.length}`;
+    sec.classList.toggle('dimmed', cnt === 0);
   });
 }
 
 function toggleFeature(feat) {
   const idx = S.selFeatures.indexOf(feat);
-  if (idx >= 0) S.selFeatures.splice(idx, 1);
-  else          S.selFeatures.push(feat);
-  refreshGrid();
-  renderSelCloud();
-  updateSnapshot();
-  scheduleDistChart();
+  setFeatures(idx >= 0 ? S.selFeatures.filter(f => f !== feat)
+                       : S.allFeatures.filter(f => f === feat || S.selFeatures.includes(f)));
 }
 
 /* Filter chips by search */
 function fgFilter(q) {
   const ql = q.toLowerCase().trim();
-  S.groups.forEach(group => {
-    const sec   = document.querySelector(`.fg-group[data-group="${group}"]`);
-    if (!sec) return;
+  document.querySelectorAll('.fg-group').forEach(sec => {
     let anyVis  = false;
     sec.querySelectorAll('.fg-chip').forEach(chip => {
       const match = !ql || chip.dataset.feat.toLowerCase().includes(ql);
@@ -1040,6 +1207,23 @@ function fgFilter(q) {
     });
     sec.style.display = anyVis ? '' : 'none';
   });
+}
+
+/* Column type overrides */
+function renderTypeTable() {
+  const el = document.getElementById('typeTbl');
+  if (!S.selFeatures.length) { el.innerHTML = '<p class="sc-cap">No features selected.</p>'; return; }
+  const detected = Object.fromEntries((S.profile?.columns || []).map(c => [c.name, c.type]));
+  el.innerHTML = '<table class="dtbl"><thead><tr><th>Column</th><th>Detected</th><th>Read as</th></tr></thead><tbody>' +
+    S.selFeatures.map(f => `<tr><td>${esc(f)}</td><td>${esc(TYPE_LABEL[detected[f]] || '—')}</td><td>
+      <select data-col="${esc(f)}" onchange="setType(this.dataset.col, this.value)">
+        ${Object.entries(TYPE_LABEL).map(([k, v]) => `<option value="${k}" ${S.types[f]===k?'selected':''}>${v}</option>`).join('')}
+      </select></td></tr>`).join('') + '</tbody></table>';
+}
+
+function setType(col, type) {
+  S.types[col] = type;
+  renderAll();
 }
 
 /* ──────────────────────────────────────────────────────────
@@ -1060,11 +1244,15 @@ function renderSelCloud() {
   renderGcTable();
 }
 
-function renderGcTable() {
+function groupCounts() {
   const counts = {};
   S.selFeatures.forEach(f => { const g=fGroup(f); counts[g]=(counts[g]||0)+1; });
-  const rows = Object.entries(counts).sort((a,b)=>b[1]-a[1]).map(([g,n])=>({Group:g,Selected:n}));
-  document.getElementById('gcTable').innerHTML = rows.length ? tbl(['Group','Selected'], rows) : '';
+  return counts;
+}
+
+function renderGcTable() {
+  const rows = Object.entries(groupCounts()).sort((a,b)=>b[1]-a[1]).map(([g,n])=>({Type:g,Selected:n}));
+  document.getElementById('gcTable').innerHTML = rows.length ? tbl(['Type','Selected'], rows) : '';
 }
 
 let chartTimer;
@@ -1072,45 +1260,54 @@ function scheduleDistChart() {
   clearTimeout(chartTimer);
   chartTimer = setTimeout(async () => {
     if (!S.selFeatures.length) { document.getElementById('gcChart').innerHTML=''; return; }
-    const d = await api('/api/chart/group-distribution', {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({features: S.selFeatures})
-    });
+    const d = await postJson('/api/chart/group-distribution', {counts: groupCounts()});
     document.getElementById('gcChart').innerHTML =
-      d.image ? `<img src="${d.image}" alt="Group distribution"/>` : '';
+      d.image ? `<img src="${d.image}" alt="Type distribution"/>` : '';
   }, 600);
 }
 
 /* ──────────────────────────────────────────────────────────
    LAUNCH
 ────────────────────────────────────────────────────────── */
+function collectSettings() {
+  const grid = readSearchSpace();
+  if (!grid) return null;
+  const feats = S.allFeatures.filter(f => S.selFeatures.includes(f));
+  const byType = t => feats.filter(f => S.types[f] === t);
+  return {
+    dataset: S.dataset,
+    targets: S.selTargets, models: S.selModels,
+    selected_features: feats,
+    cols_string: byType('categorical'), cols_date: byType('date'), cols_multi: byType('multi'),
+    run_name:           document.getElementById('runName').value,
+    split_strategy:     document.getElementById('splitStrategy').value,
+    test_size:          +document.getElementById('testSize').value,
+    threshold_val_size: +document.getElementById('threshVal').value,
+    min_recall:         +document.getElementById('minRecall').value,
+    f_beta:             +document.getElementById('fBeta').value,
+    fn_cost:            +document.getElementById('fnCost').value,
+    fp_cost:            +document.getElementById('fpCost').value,
+    split_column:       document.getElementById('splitColumn').value,
+    date_column:        document.getElementById('dateColumn').value,
+    force_retune:       document.getElementById('forceRetune').checked,
+    search_space:       grid,
+  };
+}
+
 async function launchTraining() {
   if (!S.selTargets.length)  { toast('Select at least one target.',  'err'); return; }
   if (!S.selModels.length)   { toast('Select at least one model.',   'err'); return; }
   if (!S.selFeatures.length) { toast('Select at least one feature.', 'err'); return; }
-  if (S.activeLaunchJob && !['completed','failed'].includes(S.activeLaunchJob.status)) {
+  if (S.activeLaunchJob && !JOB_DONE.includes(S.activeLaunchJob.status)) {
     toast('A training job is already running.', 'err'); return;
   }
+  const settings = collectSettings();
+  if (!settings) return;
 
   showLoader('Starting training job…');
   try {
-    const res = await api('/api/launch', {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({
-        targets: S.selTargets, models: S.selModels,
-        selected_features: S.selFeatures,
-        run_name:           document.getElementById('runName').value,
-        split_strategy:     document.getElementById('splitStrategy').value,
-        test_size:          +document.getElementById('testSize').value,
-        threshold_val_size: +document.getElementById('threshVal').value,
-        min_recall:         +document.getElementById('minRecall').value,
-        f_beta:             +document.getElementById('fBeta').value,
-        fn_cost:            +document.getElementById('fnCost').value,
-        fp_cost:            +document.getElementById('fpCost').value,
-        split_column:       document.getElementById('splitColumn').value,
-        date_column:        document.getElementById('dateColumn').value,
-      })
-    });
+    document.getElementById('launchOut').innerHTML = '';
+    const res = await postJson('/api/launch', settings);
     hideLoader();
     S.activeLaunchJob = res;
     updateSnapshot();
@@ -1118,7 +1315,13 @@ async function launchTraining() {
     document.getElementById('launchOut').innerHTML = '';
     toast('Training started. Progress will update automatically.', 'ok');
     startLaunchPolling(res.job_id);
-  } catch(e) { hideLoader(); toast('Launch failed: '+e.message,'err'); }
+  } catch(e) {
+    hideLoader();
+    toast('Launch failed: '+e.message,'err');
+    if (e.problems?.length) document.getElementById('launchOut').innerHTML =
+      `<div class="hint" style="border-color:rgba(248,113,113,.35)"><strong style="color:var(--red)">Training did not start</strong><ul style="margin:.4rem 0 0 1.1rem">` +
+      e.problems.map(p => `<li>${esc(p)}</li>`).join('') + '</ul></div>';
+  }
 }
 
 function startLaunchPolling(jobId) {
@@ -1134,34 +1337,33 @@ function stopLaunchPolling() {
 }
 
 async function pollLaunchJob(jobId) {
+  let delay = 1000;
   try {
     const job = await api('/api/launch/status?job_id=' + encodeURIComponent(jobId));
     S.activeLaunchJob = job;
     updateSnapshot();
     renderLaunchProgress(job);
-
-    if (job.status === 'completed' || job.status === 'failed') {
+    if (JOB_DONE.includes(job.status)) {
       stopLaunchPolling();
       if (job.status === 'completed') {
-        const ok = job.execution.filter(r=>r.status==='ok').length;
         const fl = job.execution.filter(r=>r.status==='failed').length;
-        toast(fl ? `Training done — ${fl} failed.` : `Training done — ${ok} succeeded.`, fl?'err':'ok');
-        renderLaunchOut(job);
+        toast(fl ? `Training done — ${fl} failed.` : 'Training done.', fl?'err':'ok');
         refreshRuns();
-      } else {
-        toast('Training failed: ' + (job.error || 'unknown error'), 'err');
-        if (job.execution?.length) renderLaunchOut(job);
-      }
+      } else toast(job.error || 'Training failed.', 'err');
+      renderLaunchOut(job);
       return;
     }
   } catch (e) {
-    stopLaunchPolling();
-    toast('Progress polling failed: ' + e.message, 'err');
-    return;
+    if (/not found/i.test(e.message)) { stopLaunchPolling(); showLatestJob(); return; }
+    // The studio may be asleep with the laptop; keep asking rather than give up.
+    document.querySelector('.launch-progress-sub')?.replaceChildren(
+      'Cannot reach the studio. Is its terminal window still open? Still trying...');
+    delay = 3000;
   }
 
-  S.launchPollTimer = setTimeout(() => pollLaunchJob(jobId), 1000);
+  S.launchPollTimer = setTimeout(() => pollLaunchJob(jobId), delay);
 }
+
 
 function renderLaunchProgress(job) {
   const el = document.getElementById('launchProgress');
@@ -1175,7 +1377,7 @@ function renderLaunchProgress(job) {
   const unitLabel = `${job.completed_units || 0}/${job.total_units || 0}`;
   const targetCount = `${job.completed_targets || 0}/${job.total_targets || 0}`;
   const tableHtml = job.execution?.length
-    ? `<div class="launch-progress-table tbl-wrap">${tbl(['target','status','models','message'], job.execution)}</div>`
+    ? `<div class="launch-progress-table tbl-wrap">${tbl(['target','status','tuning','models','message'], job.execution)}</div>`
     : '';
 
   el.innerHTML = `
@@ -1229,8 +1431,9 @@ function renderLaunchProgress(job) {
 function renderLaunchOut(res) {
   let h = `<div class="sh"><div class="sh-row"><span class="sh-title">Latest Run</span></div>
              <div class="sh-sub" style="font-family:'JetBrains Mono',monospace;font-size:.7rem">${esc(res.run_path)}</div>
-           </div>
-           <div class="tbl-wrap card mb1">${tbl(['target','status','models','returncode','message'],res.execution)}</div>`;
+           </div>`;
+  if (res.error) h += `<div class="hint mb1" style="border-color:rgba(248,113,113,.35)">${esc(res.error)}</div>`;
+  h += `<div class="tbl-wrap card mb1">${tbl(['target','status','models','returncode','message'],res.execution)}</div>`;
   const wl = res.execution.filter(r=>r.log);
   if (wl.length) {
     h += `<details style="margin-bottom:1rem"><summary>Console logs</summary>`;
@@ -1247,10 +1450,11 @@ function renderLaunchOut(res) {
 async function refreshRuns() {
   const d = await api('/api/runs');
   S.runs = d.runs;
+  const options = S.runs.map(r=>`<option value="${esc(r.path)}">${esc(r.label)}</option>`).join('');
   const sel=document.getElementById('runSel'), prev=sel.value;
-  sel.innerHTML = '<option value="">— Select an experiment run —</option>' +
-    S.runs.map(r=>`<option value="${esc(r.path)}">${esc(r.label)}</option>`).join('');
+  sel.innerHTML = '<option value="">— Select an experiment run —</option>' + options;
   if (prev && S.runs.some(r=>r.path===prev)) sel.value = prev;
+  document.getElementById('settingsRunSel').innerHTML = '<option value="">— Select a run —</option>' + options;
 }
 
 async function loadRun() {
@@ -1260,7 +1464,8 @@ async function loadRun() {
   try {
     const d = await api('/api/run/results?path='+encodeURIComponent(path));
     hideLoader();
-    document.getElementById('explorerOut').innerHTML = renderResults(d);
+    S.shownRun = d.run_path;
+    document.getElementById('explorerOut').innerHTML = renderResults(d) + renderFreeze(d);
   } catch(e) { hideLoader(); toast('Load failed: '+e.message,'err'); }
 }
 
@@ -1339,6 +1544,64 @@ function renderResults(data) {
   </div>`).join('');
 }
 
+/* ──────────────────────────────────────────────────────────
+   FREEZE
+────────────────────────────────────────────────────────── */
+function renderFreeze(data) {
+  if (!S.local || !data.targets?.length) return '';
+  const name = data.run_path.split(/[\\/]/).pop();
+  const rows = data.targets.map(t => `<tr><td>${esc(t.target)}</td><td>
+    <select class="freeze-pick" data-target="${esc(t.target)}">
+      <option value="">— Leave out —</option>
+      ${t.models.map(m => `<option value="${esc(m.name)}" ${m.name.toUpperCase()===t.cards.best_model?'selected':''}>
+        ${esc(m.name)}${m.metrics.roc_auc ? ' · AUROC ' + esc(m.metrics.roc_auc) : ''}</option>`).join('')}
+    </select></td></tr>`).join('');
+  return `
+  <div class="card mt2">
+    <div class="card-label">Freeze · One Model per Outcome</div>
+    <div class="sc-cap mb1">Copies each chosen model, its threshold and its risk bands into <code>outputs/freezes/</code>, in the layout neurosurg-predict loads. Copying it there stays a manual step.</div>
+    <div class="tbl-wrap mb1"><table class="dtbl"><thead><tr><th>Outcome</th><th>Model</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <div class="g2">
+      <div><label class="fl">Freeze name</label><input type="text" id="freezeName" value="${esc(name)}" /></div>
+    </div>
+    <details class="mt1">
+      <summary>Advanced freeze settings</summary>
+      <div class="adv-grid">
+        <div class="sld-wrap">
+          <div class="sld-head"><span class="sld-lbl">High band percentile</span><span class="sld-val" id="v-hp">90</span></div>
+          <input type="range" id="highPct" min="50" max="99" step="1" value="90" oninput="sv('v-hp',+this.value,0)"/>
+          <div class="sc-cap">Low band: below the model's threshold. High band: at or above this percentile of test-set risk.</div>
+        </div>
+      </div>
+    </details>
+    <button class="btn-cta mt1" onclick="freezeRun()">Freeze Selected Models</button>
+    <div id="freezeOut" class="mt1"></div>
+  </div>`;
+}
+
+async function freezeRun() {
+  const picks = {};
+  document.querySelectorAll('.freeze-pick').forEach(s => { if (s.value) picks[s.dataset.target] = s.value; });
+  if (!Object.keys(picks).length) { toast('Pick at least one model.', 'err'); return; }
+  showLoader('Freezing models…');
+  try {
+    const d = await postJson('/api/freeze', {
+      run_path: S.shownRun, picks,
+      name: document.getElementById('freezeName').value,
+      high_pct: +document.getElementById('highPct').value,
+    });
+    hideLoader();
+    const bands = Object.entries(d.bands).filter(([k]) => k !== '_comment')
+      .map(([outcome, b]) => ({outcome, model: picks[outcome], low: b.low, high: b.high}));
+    document.getElementById('freezeOut').innerHTML = `
+      <div class="hint mb1"><strong>Frozen to</strong> <code>${esc(d.path)}</code></div>
+      ${d.warnings.map(w => `<div class="hint mb05" style="color:var(--amber)">${esc(w)}</div>`).join('')}
+      <div class="tbl-wrap mb1">${tbl(['outcome','model','low','high'], bands)}</div>
+      <a class="btn" href="/api/freeze/download?name=${encodeURIComponent(d.name)}">Download zip</a>`;
+    toast('Freeze written.', 'ok');
+  } catch(e) { hideLoader(); toast('Freeze failed: ' + e.message, 'err'); }
+}
+
 function nodata() { return '<div class="hint" style="color:var(--t3)">Not available.</div>'; }
 function toggleAcc(i) { document.getElementById('tacc-'+i)?.classList.toggle('open'); }
 function switchMtab(ti,mi) {
@@ -1358,7 +1621,7 @@ function tbl(cols, rows) {
   rows.forEach(row => {
     h += '<tr>' + cs.map(c => {
       const v=row[c], vs=v===null||v===undefined?'—':String(v);
-      const cl = v==='ok'?'v-ok': v==='failed'?'v-fail': v==='skipped'?'v-skip':
+      const cl = v==='ok'?'v-ok': (v==='failed'||v==='interrupted')?'v-fail': v==='skipped'?'v-skip':
         (typeof v==='number'||(typeof v==='string'&&/^\d+\.?\d*$/.test(vs.trim())))?'v-num':'';
       return `<td class="${cl}">${esc(vs)}</td>`;
     }).join('') + '</tr>';
@@ -1376,7 +1639,9 @@ function toast(msg, type='info') {
   el.className='toast '+type;
   el.innerHTML=`<span class="toast-dot"></span><span>${esc(msg)}</span>`;
   document.getElementById('ts').appendChild(el);
-  setTimeout(()=>el.remove(), 4200);
+  // Errors stay until clicked so they are not missed.
+  if (type === 'err') { el.title = 'Click to dismiss'; el.style.cursor = 'pointer'; el.onclick = () => el.remove(); }
+  else setTimeout(()=>el.remove(), 4200);
 }
 
 /* ──────────────────────────────────────────────────────────

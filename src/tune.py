@@ -14,8 +14,13 @@ from sklearn.ensemble import (
 )
 from sklearn.impute import SimpleImputer
 from sklearn.linear_model import LogisticRegression, Ridge
-from sklearn.metrics import confusion_matrix, f1_score, mean_squared_error, roc_auc_score
-from sklearn.model_selection import ParameterGrid
+from sklearn.metrics import (
+    confusion_matrix,
+    f1_score,
+    mean_squared_error,
+    roc_auc_score,
+)
+from sklearn.model_selection import ParameterGrid, train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from sklearn.svm import SVC, SVR
@@ -32,6 +37,7 @@ from preprocessing import (
     infer_task_type,
     to_bool_if_binary,
 )
+from train import write_progress
 from utils.logger import logger
 
 warnings.filterwarnings("ignore", category=UserWarning)
@@ -323,6 +329,33 @@ def is_better_eval(task_type, new_eval, best_eval):
     return new_eval["sort_key"] > best_eval["sort_key"]
 
 
+def split_for_tuning(df, col_output, task_type, args):
+    """Train and validation slices cut the way train.py cuts them; the test slice stays out."""
+    if args.split_strategy == "temporal":
+        df = df.copy()
+        df["_temp_date"] = pd.to_datetime(df[args.date_column], errors="coerce")
+        df = (
+            df.dropna(subset=["_temp_date"])
+            .sort_values(by="_temp_date")
+            .drop(columns=["_temp_date"])
+        )
+        n_test = int(len(df) * args.test_size)
+        n_val = int(len(df) * args.val_size)
+        n_train = len(df) - n_val - n_test
+        return df.iloc[:n_train], df.iloc[n_train : n_train + n_val]
+
+    stratify = task_type != "continuous"
+    if args.split_strategy == "predefined":
+        train = df[df[args.split_column].astype(str).str.lower().str.contains("train")]
+    else:
+        train, _ = train_test_split(
+            df, test_size=args.test_size, random_state=42, stratify=df[col_output] if stratify else None
+        )
+    return train_test_split(
+        train, test_size=args.val_size, random_state=42, stratify=train[col_output] if stratify else None
+    )
+
+
 def main():
     parser = argparse.ArgumentParser(description="Temporal Grid Search for MedModel")
     parser.add_argument("--target", required=True, help="Target column.")
@@ -330,12 +363,15 @@ def main():
     parser.add_argument("--search_space", default="search_space.json", help="Grid search parameters.")
     parser.add_argument("--output_file", default="best_parameters.json", help="Where to save the best configs.")
     parser.add_argument("--date_column", default="Date of surgery", help="Column used for temporal sorting.")
+    parser.add_argument("--split_strategy", choices=["random", "predefined", "temporal"], default="temporal", help="How train.py splits the data.")
+    parser.add_argument("--split_column", default="Split", help="Column marking train and test rows for the predefined split.")
     parser.add_argument("--test_size", type=float, default=0.15, help="Held-out test set size (ignored during tuning).")
-    parser.add_argument("--val_size", type=float, default=0.15, help="Validation set size (used to evaluate params).")
+    parser.add_argument("--val_size", type=float, default=0.15, help="Validation set size: share of all rows for temporal, of training rows otherwise.")
     parser.add_argument("--min_recall", type=float, default=0.90, help="Binary tuning constraint: minimum recall target.")
     parser.add_argument("--f_beta", type=float, default=2.0, help="Beta for F-beta during threshold optimization.")
     parser.add_argument("--fn_cost", type=float, default=5.0, help="Relative cost assigned to each false negative.")
     parser.add_argument("--fp_cost", type=float, default=1.0, help="Relative cost assigned to each false positive.")
+    parser.add_argument("--progress_path", default=None, help="Optional JSON file path used to report tuning progress.")
     args = parser.parse_args()
 
     data_config = load_json(args.data_config)
@@ -352,7 +388,10 @@ def main():
 
     col_output = args.target
     validate_required_columns(df, [col_output], "target")
-    validate_required_columns(df, [args.date_column], "temporal split")
+    if args.split_strategy == "temporal":
+        validate_required_columns(df, [args.date_column], "temporal split")
+    elif args.split_strategy == "predefined":
+        validate_required_columns(df, [args.split_column], "predefined split")
 
     configured_columns = [
         *data_config.get("input_features", []),
@@ -362,7 +401,7 @@ def main():
     ]
     validate_required_columns(df, list(dict.fromkeys(configured_columns)), "data_config")
 
-    df = df.dropna(subset=[col_output, args.date_column]).copy()
+    df = df.dropna(subset=[col_output]).copy()
 
     task_type = infer_task_type(df[col_output])
     logger.info(f"Task: {task_type.upper()} | Target: {col_output}")
@@ -370,25 +409,12 @@ def main():
     if task_type == "binary":
         df[col_output] = to_bool_if_binary(df[col_output])
 
-    df["_temp_date"] = pd.to_datetime(df[args.date_column], errors="coerce")
-    df = (
-        df.dropna(subset=["_temp_date"])
-        .sort_values(by="_temp_date")
-        .drop(columns=["_temp_date"])
-    )
-
-    n_total = len(df)
-    n_test = int(n_total * args.test_size)
-    n_val = int(n_total * args.val_size)
-    n_train = n_total - n_val - n_test
-
-    df_train = df.iloc[:n_train]
-    df_val = df.iloc[n_train : n_train + n_val]
+    df_train, df_val = split_for_tuning(df, col_output, task_type, args)
 
     X_train, y_train = df_train, df_train[col_output]
     X_val, y_val = df_val, df_val[col_output]
 
-    logger.info(f"Temporal Split -> Train: {n_train}, Val: {n_val}, Test (held out): {n_test}")
+    logger.info(f"{args.split_strategy.title()} split -> Train: {len(df_train)}, Val: {len(df_val)}")
 
     registry = get_registry()
     valid_models = set(registry[task_type].keys())
@@ -396,7 +422,9 @@ def main():
     best_overall_params = {}
     best_selection_details = {}
 
-    for model_name, param_grid in search_space.items():
+    progress_path = Path(args.progress_path) if args.progress_path else None
+
+    for model_idx, (model_name, param_grid) in enumerate(search_space.items()):
         logger.info(f"\n--- Tuning {model_name.upper()} ---")
 
         if model_name not in valid_models:
@@ -420,7 +448,15 @@ def main():
         fail_count = 0
 
         pbar = tqdm(grid, desc=f"Grid Search ({model_name})")
-        for raw_params in pbar:
+        for grid_idx, raw_params in enumerate(pbar):
+            try:
+                write_progress(progress_path, {
+                    "completed_models": model_idx,
+                    "current_model": model_name,
+                    "current_step": f"Tuning {model_name}: setting {grid_idx + 1} of {len(grid)}",
+                })
+            except OSError:
+                pass  # Windows refuses the replace while the studio reads the file; the next step writes again.
             try:
                 params = apply_imbalance_strategy(model_name, task_type, raw_params, y_train)
 

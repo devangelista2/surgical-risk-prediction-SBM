@@ -352,6 +352,9 @@ def evaluate_and_save(
 
             plot_data["y_true_bin"] = y_true_bin
             plot_data["y_prob_pos"] = y_prob_pos
+            pd.DataFrame({"y_true": y_true_bin, "y_prob": y_prob_pos}).to_csv(
+                model_dir / "test_predictions.csv", index=False
+            )
 
             policy = {
                 "threshold": float(threshold),
