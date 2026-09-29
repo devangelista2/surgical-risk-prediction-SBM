@@ -20,10 +20,8 @@ ENV HOME=/home/user \
 
 WORKDIR /home/user/app
 
-# Install CPU-only PyTorch first (no CUDA → much smaller), then the rest.
 COPY --chown=user requirements-deploy.txt .
 RUN pip install --no-cache-dir --upgrade pip \
-    && pip install --no-cache-dir torch==2.2.2 --index-url https://download.pytorch.org/whl/cpu \
     && pip install --no-cache-dir -r requirements-deploy.txt
 
 # Copy the application (model artifacts under outputs/ are included).
