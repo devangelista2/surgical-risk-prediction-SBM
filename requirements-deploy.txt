@@ -2,9 +2,6 @@
 # Versions are pinned to match the libraries the committed pipeline.joblib
 # models were trained with — scikit-learn in particular MUST stay at 1.5.2 or
 # joblib may fail to unpickle / silently misbehave.
-#
-# NOTE: torch is installed separately in the Dockerfile from the CPU-only index
-# (smaller image, no CUDA), so it is intentionally not listed here.
 flask>=3.1,<4
 gunicorn>=21,<24
 joblib>=1.3,<2

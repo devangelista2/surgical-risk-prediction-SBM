@@ -107,9 +107,7 @@
 Overall Training Progress:  20%|##        | 1/5 [00:07<00:28,  7.19s/model, Current Model=hgb]Overall Training Progress:  20%|##        | 1/5 [00:07<00:28,  7.19s/model, Current Model=lr] 2026-04-20 20:50:36 - INFO - Model lr selected threshold=0.163 (val recall=0.968, precision=0.323, meets_recall=True)
 Overall Training Progress:  40%|####      | 2/5 [00:10<00:15,  5.18s/model, Current Model=lr]Overall Training Progress:  40%|####      | 2/5 [00:10<00:15,  5.18s/model, Current Model=rf]2026-04-20 20:50:41 - INFO - Model rf selected threshold=0.228 (val recall=0.903, precision=0.378, meets_recall=True)
 Overall Training Progress:  60%|######    | 3/5 [00:19<00:13,  6.52s/model, Current Model=rf]Overall Training Progress:  60%|######    | 3/5 [00:19<00:13,  6.52s/model, Current Model=svc]2026-04-20 20:50:48 - INFO - Model svc selected threshold=0.163 (val recall=0.903, precision=0.304, meets_recall=True)
-Overall Training Progress:  80%|########  | 4/5 [00:23<00:05,  5.57s/model, Current Model=svc]Overall Training Progress:  80%|########  | 4/5 [00:23<00:05,  5.57s/model, Current Model=torch_mlp]2026-04-20 20:50:58 - INFO - Model torch_mlp selected threshold=0.015 (val recall=0.839, precision=0.338, meets_recall=False)
-Overall Training Progress: 100%|##########| 5/5 [00:32<00:00,  6.92s/model, Current Model=torch_mlp]Overall Training Progress: 100%|##########| 5/5 [00:32<00:00,  6.50s/model, Current Model=torch_mlp]
-
+Overall Training Progress:  80%|########  | 4/5 [00:23<00:05,  5.57s/model, Current Model=svc]
 ==================================================
 2026-04-20 20:51:03 - INFO - Benchmark complete! Summary and plots saved to C:\Users\tivog\surgical-risk-prediction-SBM\outputs\studio_runs\20260420-204930-all-features\New neurological deficits
 ==================================================

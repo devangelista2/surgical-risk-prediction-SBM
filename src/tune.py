@@ -26,11 +26,6 @@ from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from sklearn.svm import SVC, SVR
 from tqdm import tqdm
 
-from nn.torch_ft_transformer import (
-    TorchFTTransformerClassifier,
-    TorchFTTransformerRegressor,
-)
-from nn.torch_mlp import TorchMLPClassifier, TorchMLPRegressor
 from preprocessing import (
     CommaSeparatedMultiLabelBinarizer,
     UnixTimestampTransformer,
@@ -107,24 +102,18 @@ def get_registry():
             "rf": RandomForestClassifier,
             "lr": LogisticRegression,
             "svc": SVC,
-            "torch_mlp": TorchMLPClassifier,
-            "torch_ft_transformer": TorchFTTransformerClassifier,
         },
         "categorical": {
             "hgb": HistGradientBoostingClassifier,
             "rf": RandomForestClassifier,
             "lr": LogisticRegression,
             "svc": SVC,
-            "torch_mlp": TorchMLPClassifier,
-            "torch_ft_transformer": TorchFTTransformerClassifier,
         },
         "continuous": {
             "hgb": HistGradientBoostingRegressor,
             "rf": RandomForestRegressor,
             "ridge": Ridge,
             "svc": SVR,
-            "torch_mlp": TorchMLPRegressor,
-            "torch_ft_transformer": TorchFTTransformerRegressor,
         },
     }
 
@@ -185,17 +174,6 @@ def apply_imbalance_strategy(model_name: str, task_type: str, params: dict, y_tr
 
     if model_name in {"rf", "lr", "svc"} and "class_weight" not in new_params:
         new_params["class_weight"] = {k.item() if hasattr(k, "item") else k: v for k, v in weights.items()}
-
-    if model_name in {"torch_mlp", "torch_ft_transformer"}:
-        classes_sorted = sorted(weights.keys())
-        if task_type == "binary" and "pos_weight" not in new_params:
-            neg_label, pos_label = classes_sorted[0], classes_sorted[-1]
-            neg_w = weights[neg_label]
-            pos_w = weights[pos_label]
-            if neg_w > 0:
-                new_params["pos_weight"] = float(pos_w / neg_w)
-        elif task_type == "categorical" and "class_weights" not in new_params:
-            new_params["class_weights"] = [float(weights[c]) for c in classes_sorted]
 
     return new_params
 
@@ -433,13 +411,7 @@ def main():
             best_selection_details[model_name] = {"status": "invalid_for_task"}
             continue
 
-        use_scaler = model_name in {
-            "lr",
-            "ridge",
-            "svc",
-            "torch_mlp",
-            "torch_ft_transformer",
-        }
+        use_scaler = model_name in {"lr", "ridge", "svc"}
         grid = list(ParameterGrid(param_grid))
 
         best_params = None
@@ -470,15 +442,10 @@ def main():
                 model = get_model(model_name, task_type, params)
                 pipeline = Pipeline([("preprocess", preprocessor), ("model", model)])
 
-                if model_name in {"torch_mlp", "torch_ft_transformer"}:
-                    X_train_t = pipeline.named_steps["preprocess"].fit_transform(X_train, y_train)
-                    X_val_t = pipeline.named_steps["preprocess"].transform(X_val)
-                    pipeline.named_steps["model"].fit(X_train_t, y_train, eval_set=(X_val_t, y_val))
-                else:
-                    fit_kwargs = {}
-                    if model_name == "hgb" and task_type in {"binary", "categorical"}:
-                        fit_kwargs["model__sample_weight"] = sample_weight_from_y(y_train)
-                    pipeline.fit(X_train, y_train, **fit_kwargs)
+                fit_kwargs = {}
+                if model_name == "hgb" and task_type in {"binary", "categorical"}:
+                    fit_kwargs["model__sample_weight"] = sample_weight_from_y(y_train)
+                pipeline.fit(X_train, y_train, **fit_kwargs)
 
                 eval_result = evaluate_val(
                     pipeline,

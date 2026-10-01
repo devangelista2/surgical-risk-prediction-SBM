@@ -19,8 +19,7 @@
         "hgb",
         "rf",
         "lr",
-        "svc",
-        "torch_mlp"
+        "svc"
     ],
     "data_configuration": {
         "input_file": "./data/SBM1212.xlsx",
@@ -111,18 +110,6 @@
                 "false": 0.5714285714285714,
                 "true": 4.0
             }
-        },
-        "torch_mlp": {
-            "batch_size": 64,
-            "dropout": 0.4,
-            "epochs": 150,
-            "hidden_layers": [
-                64,
-                32
-            ],
-            "learning_rate": 0.0001,
-            "weight_decay": 0.0001,
-            "pos_weight": 7.0
         }
     },
     "binary_decision_policy": {

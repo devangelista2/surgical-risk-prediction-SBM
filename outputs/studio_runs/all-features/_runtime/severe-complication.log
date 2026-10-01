@@ -107,9 +107,7 @@
 Overall Training Progress:  20%|##        | 1/5 [00:07<00:28,  7.19s/model, Current Model=hgb]Overall Training Progress:  20%|##        | 1/5 [00:07<00:28,  7.19s/model, Current Model=lr] 2026-04-20 20:51:17 - INFO - Model lr selected threshold=0.055 (val recall=0.667, precision=0.045, meets_recall=False)
 Overall Training Progress:  40%|####      | 2/5 [00:10<00:15,  5.11s/model, Current Model=lr]Overall Training Progress:  40%|####      | 2/5 [00:10<00:15,  5.11s/model, Current Model=rf]2026-04-20 20:51:21 - INFO - Model rf selected threshold=0.069 (val recall=1.000, precision=0.058, meets_recall=True)
 Overall Training Progress:  60%|######    | 3/5 [00:18<00:12,  6.44s/model, Current Model=rf]Overall Training Progress:  60%|######    | 3/5 [00:18<00:12,  6.44s/model, Current Model=svc]2026-04-20 20:51:29 - INFO - Model svc selected threshold=0.010 (val recall=1.000, precision=0.052, meets_recall=True)
-Overall Training Progress:  80%|########  | 4/5 [00:30<00:08,  8.43s/model, Current Model=svc]Overall Training Progress:  80%|########  | 4/5 [00:30<00:08,  8.43s/model, Current Model=torch_mlp]2026-04-20 20:51:46 - INFO - Model torch_mlp selected threshold=0.035 (val recall=0.667, precision=0.048, meets_recall=False)
-Overall Training Progress: 100%|##########| 5/5 [00:40<00:00,  8.94s/model, Current Model=torch_mlp]Overall Training Progress: 100%|##########| 5/5 [00:40<00:00,  8.04s/model, Current Model=torch_mlp]
-
+Overall Training Progress:  80%|########  | 4/5 [00:30<00:08,  8.43s/model, Current Model=svc]
 ==================================================
 2026-04-20 20:51:51 - INFO - Benchmark complete! Summary and plots saved to C:\Users\tivog\surgical-risk-prediction-SBM\outputs\studio_runs\20260420-204930-all-features\Severe complication
 ==================================================

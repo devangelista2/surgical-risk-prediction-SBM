@@ -1,6 +1,6 @@
 # SBM Stratify Training Studio
 
-A streamlined, robust, and highly configurable machine learning studio for medical tabular data. It handles both classification and regression automatically, supports temporal/predefined/random splitting strategies, tunes and trains Scikit-Learn and PyTorch models, and exports publication-ready scientific plots — all from a single web app.
+A streamlined, robust, and highly configurable machine learning studio for medical tabular data. It handles both classification and regression automatically, supports temporal/predefined/random splitting strategies, tunes and trains Scikit-Learn models, and exports publication-ready scientific plots — all from a single web app.
 
 ## 📂 Project Structure
 
@@ -13,7 +13,6 @@ A streamlined, robust, and highly configurable machine learning studio for medic
 │   ├── train.py              # Training script (spawned by the studio per target)
 │   ├── tune.py               # Grid-search tuning script
 │   ├── preprocessing.py      # Custom scikit-learn transformers (dates, multilabel)
-│   ├── nn/                   # PyTorch MLP and FT-Transformer
 │   └── utils/                # Logging and publication-ready plotting utilities
 ├── configs/
 │   ├── grid_search_light.json    # Small grid — fastest tuning

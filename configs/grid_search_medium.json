@@ -28,19 +28,5 @@
         "kernel": ["rbf", "linear"],
         "gamma": ["scale", "auto", 0.1, 0.01],
         "probability": [true]
-    },
-
-    "torch_mlp": {
-        "hidden_layers": [
-            [128, 64],
-            [256, 128, 64],
-            [512, 256, 128],
-            [64, 32]
-        ],
-        "dropout": [0.1, 0.2, 0.4],
-        "learning_rate": [1e-3, 5e-4, 1e-4],
-        "weight_decay": [0.0, 1e-4, 1e-3],
-        "epochs": [150],
-        "batch_size": [32, 64]
     }
 }
